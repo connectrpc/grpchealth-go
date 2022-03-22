@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package grpchealth lets connect servers support gRPC's health-checking API.
+// Package grpchealth lets any net/http server, including servers using
+// connect, support gRPC's health-checking API.
 //
 // The core connect package is github.com/bufbuild/connect, and documentation
 // is available at https://bufconnect.com/.
