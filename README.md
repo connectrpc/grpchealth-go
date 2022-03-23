@@ -5,12 +5,12 @@ connect-grpchealth-go
 [![Report Card](https://goreportcard.com/badge/connectrpc.com/grpchealth)](https://goreportcard.com/report/connectrpc.com/grpchealth)
 [![GoDoc](https://pkg.go.dev/badge/connectrpc.com/grpchealth.svg)](https://pkg.go.dev/connectrpc.com/grpchealth)
 
-`connect-grpchealth-go` enables any `net/http` server&mdash;including those
-built with [Connect][docs]!&mdash;to respond to gRPC-style health checks. This
-lets load balancers, container orchestrators, and other infrastructure systems
-respond to changes in your HTTP server's health.
+`connect-grpchealth-go` adds support for gRPC-style health checks to any
+`net/http` server&mdash;including those built with [Connect][docs]! By polling
+this API, load balancers, container orchestrators, and other infrastructure
+systems can respond to changes in your HTTP server's health.
 
-The exposed health-checking API is wire compatible with Google's gRPC
+The exposed health checking API is wire compatible with Google's gRPC
 implementations, so it works with [grpcurl], [grpc-health-probe], and
 [Kubernetes gRPC liveness probes][k8s-liveness].
 
