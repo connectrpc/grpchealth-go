@@ -1,7 +1,7 @@
 Contributing
 ============
 
-We'd love your help making connect-grpchealth-go better!
+We'd love your help making `connect-grpchealth-go` better!
 
 If you'd like to add new exported APIs, please [open an issue][open-issue]
 describing your proposal &mdash; discussing API changes ahead of time makes
