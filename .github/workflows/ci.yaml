@@ -28,12 +28,17 @@ jobs:
         uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go-version }}
+      # TODO: Remove when connect is public.
+      - name: Configure Private Repo Access
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.CONNECT_DEPLOY_KEY }}
       - name: Cache
         uses: actions/cache@v2
         with:
           path: ~/go/pkg/mod
-          key: ${{ runner.os }}-connect-ci-${{ hashFiles('**/go.sum') }}
-          restore-keys: ${{ runner.os }}-connect-ci-
+          key: ${{ runner.os }}-connect-grpchealth-go-ci-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-connect-grpchealth-go-ci-
       - name: Test
         run: make test
       - name: Lint
