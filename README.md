@@ -5,11 +5,14 @@ connect-grpchealth-go
 [![Report Card](https://goreportcard.com/badge/github.com/bufbuild/connect-grpchealth-go)](https://goreportcard.com/report/github.com/bufbuild/connect-grpchealth-go)
 [![GoDoc](https://pkg.go.dev/badge/github.com/bufbuild/connect-grpchealth-go.svg)](https://pkg.go.dev/github.com/bufbuild/connect-grpchealth-go)
 
-`connect-grpchealth-go` lets any `net/http` server (including ones built with
-[connect][docs]!) support gRPC-style health checks. The exposed health-checking
-API is wire-compatible with Google's gRPC implementations, so it works with
-[grpcurl][], [grpc-health-probe][], and [Kubernetes gRPC liveness
-probes][k8s-liveness].
+`connect-grpchealth-go` enables any `net/http` server&mdash;including those
+built with [Connect][docs]!&mdash;to respond to gRPC-style health checks. This
+lets load balancers, container orchestrators, and other infrastructure systems
+respond to changes in your HTTP server's health.
+
+The exposed health-checking API is wire compatible with Google's gRPC
+implementations, so it works with [grpcurl], [grpc-health-probe], and
+[Kubernetes gRPC liveness probes][k8s-liveness].
 
 ## Example
 
@@ -38,12 +41,12 @@ func main() {
 
 ## Status
 
-Like [connect][] itself, connect-grpchealth-go is in _beta_. We plan to tag a
+Like [Connect][] itself, `connect-grpchealth-go` is in _beta_. We plan to tag a
 release candidate in July 2022 and stable v1 soon after the Go 1.19 release.
 
 ## Support and Versioning
 
-connect-grpchealth-go supports:
+`connect-grpchealth-go` supports:
 
 * The [two most recent major releases][go-support-policy] of Go, with a minimum
   of Go 1.18.
