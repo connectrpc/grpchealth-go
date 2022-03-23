@@ -144,16 +144,12 @@ func NewStaticChecker(services ...string) *StaticChecker {
 }
 
 // Check implements Checker.
-func (c *StaticChecker) Check(
-	ctx context.Context,
-	req *CheckRequest) (*CheckResponse, error) {
-	service := req.Service
-	_, registered := c.services[service]
-	if service == "" || registered {
+func (c *StaticChecker) Check(ctx context.Context, req *CheckRequest) (*CheckResponse, error) {
+	if _, registered := c.services[req.Service]; req.Service == "" || registered {
 		return &CheckResponse{Status: StatusServing}, nil
 	}
 	return nil, connect.NewError(
 		connect.CodeNotFound,
-		fmt.Errorf("unknown service %s", service),
+		fmt.Errorf("unknown service %s", req.Service),
 	)
 }
