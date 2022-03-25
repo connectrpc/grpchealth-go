@@ -1,10 +1,10 @@
-// Copyright 2022 Buf Technologies, Inc.
+// Copyright 2015 gRPC authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//      http://www.apache.org/licenses/LICENSE-2.0
+//     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,12 +14,14 @@
 
 syntax = "proto3";
 
+
 // This package is intended for internal use by connect-grpc-go, and provides
-// no backward compatibility guarantees whatsoever.
+// no backward compatibility guarantees whatsoever. Apart from the package
+// name, the schema here must remain wire compatible with the original.
 //
-// The types here must remain wire-compatible with the types in
-// grpc.health.v1:
-//   https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto
+// Copied from gRPC's health check schema, with small modifications to prevent
+// init-time panics:
+// https://github.com/grpc/grpc-proto/blob/master/grpc/health/v1/health.proto
 package internal.health.v1;
 
 message HealthCheckRequest {
