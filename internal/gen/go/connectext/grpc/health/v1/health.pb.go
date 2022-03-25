@@ -19,11 +19,12 @@
 // source: connectext/grpc/health/v1/health.proto
 
 // This package is intended for internal use by connect-grpc-go, and provides
-// no backward compatibility guarantees whatsoever.
+// no backward compatibility guarantees whatsoever. Apart from the package
+// name, the schema here must remain wire compatible with the original.
 //
-// The types here must remain wire-compatible with the types in
-// grpc.health.v1:
-//   https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto
+// Copied from gRPC's health check schema, with small modifications to prevent
+// init-time panics:
+// https://github.com/grpc/grpc-proto/blob/master/grpc/health/v1/health.proto
 
 package healthv1
 
