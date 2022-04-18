@@ -12,17 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package grpchealth enables any net/http server, including those built with
-// Connect, to respond to gRPC-style health checks. This lets load balancers,
-// container orchestrators, and other infrastructure systems respond to changes
-// in your HTTP server's health.
-//
-// The exposed health-checking API is wire compatible with Google's gRPC
-// implementations, so it works with grpcurl, grpc-health-probe, and Kubernetes
-// gRPC liveness probes.
-//
-// The core Connect package is github.com/bufbuild/connect. Documentation is
-// available at https://bufconnect.com/.
+// Package grpchealth is not ready for consumption.
 package grpchealth
 
 import (
