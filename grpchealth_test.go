@@ -30,7 +30,7 @@ func TestHealth(t *testing.T) {
 		userFQN = "acme.user.v1.UserService"
 		unknown = "foobar"
 	)
-
+	t.Parallel()
 	mux := http.NewServeMux()
 	checker := NewStaticChecker(userFQN)
 	mux.Handle(NewHandler(checker))
@@ -48,7 +48,7 @@ func TestHealth(t *testing.T) {
 		t.Fatalf(err.Error())
 	}
 
-	t.Run("process", func(t *testing.T) {
+	t.Run("process", func(t *testing.T) { // nolint: paralleltest
 		res, err := client.CallUnary(
 			context.Background(),
 			connect.NewRequest(&healthv1.HealthCheckRequest{}),
@@ -60,7 +60,7 @@ func TestHealth(t *testing.T) {
 			t.Fatalf("got status %v, expected %v", res.Msg.Status, StatusServing)
 		}
 	})
-	t.Run("known", func(t *testing.T) {
+	t.Run("known", func(t *testing.T) { // nolint: paralleltest
 		res, err := client.CallUnary(
 			context.Background(),
 			connect.NewRequest(&healthv1.HealthCheckRequest{Service: userFQN}),
@@ -72,7 +72,7 @@ func TestHealth(t *testing.T) {
 			t.Fatalf("got status %v, expected %v", res.Msg.Status, StatusServing)
 		}
 	})
-	t.Run("unknown", func(t *testing.T) {
+	t.Run("unknown", func(t *testing.T) { // nolint: paralleltest
 		_, err := client.CallUnary(
 			context.Background(),
 			connect.NewRequest(&healthv1.HealthCheckRequest{Service: unknown}),
@@ -88,7 +88,7 @@ func TestHealth(t *testing.T) {
 			t.Fatalf("got code %v, expected CodeNotFound", code)
 		}
 	})
-	t.Run("watch", func(t *testing.T) {
+	t.Run("watch", func(t *testing.T) { // nolint: paralleltest
 		client, err := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
 			server.Client(),
 			server.URL+"/grpc.health.v1.Health/Watch",
