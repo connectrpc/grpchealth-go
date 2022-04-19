@@ -42,7 +42,7 @@ lint: $(BIN)/golangci-lint $(BIN)/buf ## Lint Go and protobuf
 	$(BIN)/buf lint
 
 .PHONY: lintfix
-lintfix: $(BIN)/gofmt $(BIN)/buf ## Automatically fix some lint errors
+lintfix: $(BIN)/golangci-lint $(BIN)/buf ## Automatically fix some lint errors
 	$(BIN)/golangci-lint run --fix
 	$(BIN)/buf format -w .
 
