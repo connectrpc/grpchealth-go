@@ -41,7 +41,7 @@ const (
 	StatusNotServing Status = 2
 )
 
-// NewCustomHandler wraps the supplied Checker to build an HTTP handler for gRPC's
+// NewHandler wraps the supplied Checker to build an HTTP handler for gRPC's
 // health-checking API. It returns the path on which to mount the handler and
 // the HTTP handler itself.
 //
