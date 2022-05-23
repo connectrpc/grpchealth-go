@@ -21,7 +21,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/bufbuild/connect"
+	"github.com/bufbuild/connect-go"
 	healthv1 "github.com/bufbuild/connect-grpchealth-go/internal/gen/go/connectext/grpc/health/v1"
 )
 
@@ -39,14 +39,11 @@ func TestHealth(t *testing.T) {
 	server.StartTLS()
 	defer server.Close()
 
-	client, err := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
+	client := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
 		server.Client(),
 		server.URL+"/grpc.health.v1.Health/Check",
 		connect.WithGRPC(),
 	)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
 
 	t.Run("process", func(t *testing.T) { // nolint: paralleltest
 		res, err := client.CallUnary(
@@ -89,14 +86,11 @@ func TestHealth(t *testing.T) {
 		}
 	})
 	t.Run("watch", func(t *testing.T) { // nolint: paralleltest
-		client, err := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
+		client := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
 			server.Client(),
 			server.URL+"/grpc.health.v1.Health/Watch",
 			connect.WithGRPC(),
 		)
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
 		stream, err := client.CallServerStream(
 			context.Background(),
 			connect.NewRequest(&healthv1.HealthCheckRequest{Service: userFQN}),
