@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/bufbuild/connect"
+	"connectrpc.com/connect"
 	healthv1 "connectrpc.com/grpchealth/internal/gen/go/connectext/grpc/health/v1"
 )
 
