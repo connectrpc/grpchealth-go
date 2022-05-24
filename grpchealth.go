@@ -131,6 +131,10 @@ type StaticChecker struct {
 }
 
 // NewStaticChecker constructs a StaticChecker.
+//
+// The supplied strings should be fully-qualified protobuf service names (for
+// example, "acme.user.v1.UserService"). Generated connect service files
+// have this declared as a constant.
 func NewStaticChecker(services ...string) *StaticChecker {
 	set := make(map[string]struct{}, len(services))
 	for _, service := range services {
