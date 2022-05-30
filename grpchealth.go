@@ -21,8 +21,8 @@
 // implementations, so it works with grpcurl, grpc-health-probe, and Kubernetes
 // gRPC liveness probes.
 //
-// The core Connect package is github.com/bufbuild/connect. Documentation is
-// available at https://bufconnect.com/.
+// The core Connect package is github.com/bufbuild/connect-go. Documentation is
+// available at https://connect.build.
 package grpchealth
 
 import (
