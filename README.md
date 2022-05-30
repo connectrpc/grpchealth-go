@@ -6,13 +6,17 @@ connect-grpchealth-go
 [![GoDoc](https://pkg.go.dev/badge/connectrpc.com/grpchealth.svg)](https://pkg.go.dev/connectrpc.com/grpchealth)
 
 `connect-grpchealth-go` adds support for gRPC-style health checks to any
-`net/http` server &mdash; including those built with [Connect][docs]. By
+`net/http` server &mdash; including those built with [Connect][connect-go]. By
 polling this API, load balancers, container orchestrators, and other
 infrastructure systems can respond to changes in your HTTP server's health.
 
 The exposed health checking API is wire compatible with Google's gRPC
 implementations, so it works with [grpcurl], [grpc-health-probe], and
 [Kubernetes gRPC liveness probes][k8s-liveness].
+
+For more on Connect, see the [announcement blog post][blog], the documentation
+on [connectrpc.com][docs] (especially the [Getting Started] guide for Go), the
+[`connect-go`][connect-go] repo, or the [demo service][demo].
 
 ## Example
 
@@ -48,7 +52,7 @@ func main() {
 
 ## Status
 
-Like [`connect-go`][connect], `connect-grpchealth-go` is a release
+Like [`connect-go`][connect-go], `connect-grpchealth-go` is a release
 candidate. We plan to tag further release candidates as necessary and a stable
 v1 soon after the Go 1.19 release.
 
@@ -67,7 +71,11 @@ Within those parameters, it follows semantic versioning.
 Offered under the [Apache 2 license][license].
 
 [APIv2]: https://blog.golang.org/protobuf-apiv2
-[connect]: https://connectrpc.com/connect
+[Getting Started]: https://connectrpc.com/go/getting-started
+[blog]: https://buf.build/blog/announcing-connect-a-better-grpc
+[connect-go]: https://connectrpc.com/connect
+[demo]: https://github.com/bufbuild/connect-demo
+[docs]: https://connectrpc.com
 [docs]: https://connectrpc.com
 [go-support-policy]: https://golang.org/doc/devel/release#policy
 [grpc-health-probe]: https://github.com/grpc-ecosystem/grpc-health-probe/
