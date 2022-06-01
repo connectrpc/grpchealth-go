@@ -3,6 +3,6 @@ module github.com/bufbuild/connect-grpchealth-go
 go 1.18
 
 require (
-	github.com/bufbuild/connect-go v0.0.0-20220520175512-2b3d3442ffb8
+	github.com/bufbuild/connect-go v0.1.0
 	google.golang.org/protobuf v1.28.0
 )
