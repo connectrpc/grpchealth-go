@@ -37,7 +37,7 @@ func TestHealth(t *testing.T) {
 	server := httptest.NewUnstartedServer(mux)
 	server.EnableHTTP2 = true
 	server.StartTLS()
-	defer server.Close()
+	t.Cleanup(server.Close)
 
 	client := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
 		server.Client(),
@@ -45,7 +45,8 @@ func TestHealth(t *testing.T) {
 		connect.WithGRPC(),
 	)
 
-	t.Run("process", func(t *testing.T) { // nolint: paralleltest
+	t.Run("process", func(t *testing.T) {
+		t.Parallel()
 		res, err := client.CallUnary(
 			context.Background(),
 			connect.NewRequest(&healthv1.HealthCheckRequest{}),
@@ -57,7 +58,8 @@ func TestHealth(t *testing.T) {
 			t.Fatalf("got status %v, expected %v", res.Msg.Status, StatusServing)
 		}
 	})
-	t.Run("known", func(t *testing.T) { // nolint: paralleltest
+	t.Run("known", func(t *testing.T) {
+		t.Parallel()
 		res, err := client.CallUnary(
 			context.Background(),
 			connect.NewRequest(&healthv1.HealthCheckRequest{Service: userFQN}),
@@ -69,7 +71,8 @@ func TestHealth(t *testing.T) {
 			t.Fatalf("got status %v, expected %v", res.Msg.Status, StatusServing)
 		}
 	})
-	t.Run("unknown", func(t *testing.T) { // nolint: paralleltest
+	t.Run("unknown", func(t *testing.T) {
+		t.Parallel()
 		_, err := client.CallUnary(
 			context.Background(),
 			connect.NewRequest(&healthv1.HealthCheckRequest{Service: unknown}),
@@ -85,7 +88,8 @@ func TestHealth(t *testing.T) {
 			t.Fatalf("got code %v, expected CodeNotFound", code)
 		}
 	})
-	t.Run("watch", func(t *testing.T) { // nolint: paralleltest
+	t.Run("watch", func(t *testing.T) {
+		t.Parallel()
 		client := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
 			server.Client(),
 			server.URL+"/grpc.health.v1.Health/Watch",
