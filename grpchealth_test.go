@@ -45,76 +45,78 @@ func TestHealth(t *testing.T) {
 		connect.WithGRPC(),
 	)
 
-	t.Run("process", func(t *testing.T) {
-		t.Parallel()
+	assertStatus := func(
+		t *testing.T,
+		service string,
+		expect Status,
+	) {
+		t.Helper()
 		res, err := client.CallUnary(
 			context.Background(),
-			connect.NewRequest(&healthv1.HealthCheckRequest{}),
+			connect.NewRequest(&healthv1.HealthCheckRequest{Service: service}),
 		)
 		if err != nil {
 			t.Fatalf(err.Error())
 		}
-		if Status(res.Msg.Status) != StatusServing {
-			t.Fatalf("got status %v, expected %v", res.Msg.Status, StatusServing)
+		if Status(res.Msg.Status) != expect {
+			t.Fatalf("got status %v, expected %v", res.Msg.Status, expect)
 		}
-	})
-	t.Run("known", func(t *testing.T) {
-		t.Parallel()
-		res, err := client.CallUnary(
-			context.Background(),
-			connect.NewRequest(&healthv1.HealthCheckRequest{Service: userFQN}),
-		)
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
-		if Status(res.Msg.Status) != StatusServing {
-			t.Fatalf("got status %v, expected %v", res.Msg.Status, StatusServing)
-		}
-	})
-	t.Run("unknown", func(t *testing.T) {
-		t.Parallel()
+	}
+	assertUnknown := func(
+		t *testing.T,
+		service string,
+	) {
+		t.Helper()
 		_, err := client.CallUnary(
 			context.Background(),
-			connect.NewRequest(&healthv1.HealthCheckRequest{Service: unknown}),
+			connect.NewRequest(&healthv1.HealthCheckRequest{Service: service}),
 		)
 		if err == nil {
-			t.Fatalf("expected error checking unknown service")
+			t.Fatalf("expected error checking unknown service %q", service)
 		}
 		var connectErr *connect.Error
 		if ok := errors.As(err, &connectErr); !ok {
 			t.Fatalf("got %v (%T), expected a *connect.Error", err, err)
 		}
 		if code := connectErr.Code(); code != connect.CodeNotFound {
-			t.Fatalf("got code %v, expected CodeNotFound", code)
+			t.Fatalf("check %q: got code %v, expected CodeNotFound", service, code)
 		}
-	})
-	t.Run("watch", func(t *testing.T) {
-		t.Parallel()
-		client := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
-			server.Client(),
-			server.URL+"/grpc.health.v1.Health/Watch",
-			connect.WithGRPC(),
-		)
-		stream, err := client.CallServerStream(
-			context.Background(),
-			connect.NewRequest(&healthv1.HealthCheckRequest{Service: userFQN}),
-		)
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
-		defer stream.Close()
-		if ok := stream.Receive(); ok {
-			t.Fatalf("got message from Watch")
-		}
-		if stream.Err() == nil {
-			t.Fatalf("expected error from stream")
-		}
-		var connectErr *connect.Error
-		if ok := errors.As(stream.Err(), &connectErr); !ok {
-			t.Fatalf("got %v (%T), expected a *connect.Error", err, err)
-		}
-		if code := connectErr.Code(); code != connect.CodeUnimplemented {
-			t.Fatalf("got code %v, expected CodeUnimplemented", code)
-		}
-	})
+	}
+
+	assertStatus(t, "" /* process */, StatusServing)
+
+	assertStatus(t, userFQN, StatusServing)
+	checker.SetStatus(userFQN, StatusNotServing)
+	assertStatus(t, userFQN, StatusNotServing)
+
+	assertUnknown(t, unknown)
+	checker.SetStatus(unknown, StatusServing)
+	assertStatus(t, unknown, StatusServing)
+
+	watcher := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
+		server.Client(),
+		server.URL+"/grpc.health.v1.Health/Watch",
+		connect.WithGRPC(),
+	)
+	stream, err := watcher.CallServerStream(
+		context.Background(),
+		connect.NewRequest(&healthv1.HealthCheckRequest{Service: userFQN}),
+	)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	defer stream.Close()
+	if ok := stream.Receive(); ok {
+		t.Fatalf("got message from Watch")
+	}
+	if stream.Err() == nil {
+		t.Fatalf("expected error from stream")
+	}
+	var connectErr *connect.Error
+	if ok := errors.As(stream.Err(), &connectErr); !ok {
+		t.Fatalf("got %v (%T), expected a *connect.Error", err, err)
+	}
+	if code := connectErr.Code(); code != connect.CodeUnimplemented {
+		t.Fatalf("got code %v, expected CodeUnimplemented", code)
+	}
 }
