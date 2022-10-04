@@ -30,6 +30,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"connectrpc.com/connect"
 	healthv1 "connectrpc.com/grpchealth/internal/gen/go/connectext/grpc/health/v1"
@@ -130,33 +131,49 @@ type Checker interface {
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
 }
 
-// StaticChecker is a simple Checker implementation that always returns
-// StatusServing for the process and a static set of known services.
+// StaticChecker is a simple Checker implementation. It always returns
+// StatusServing for the process, and it returns a static value for each
+// service.
 //
 // If you have a dynamic list of services, want to ping a database as part of
 // your health check, or otherwise need something more specialized, you should
 // write a custom Checker implementation.
 type StaticChecker struct {
-	services map[string]struct{}
+	mu       sync.RWMutex
+	statuses map[string]Status
 }
 
-// NewStaticChecker constructs a StaticChecker.
+// NewStaticChecker constructs a StaticChecker. By default, each of the
+// supplied services has StatusServing.
 //
 // The supplied strings should be fully-qualified protobuf service names (for
 // example, "acme.user.v1.UserService"). Generated Connect service files
 // have this declared as a constant.
 func NewStaticChecker(services ...string) *StaticChecker {
-	set := make(map[string]struct{}, len(services))
+	statuses := make(map[string]Status, len(services))
 	for _, service := range services {
-		set[service] = struct{}{}
+		statuses[service] = StatusServing
 	}
-	return &StaticChecker{services: set}
+	return &StaticChecker{statuses: statuses}
 }
 
-// Check implements Checker.
+// SetStatus sets the health status of a service, registering a new service if
+// necessary. It's safe to call SetStatus and Check concurrently.
+func (c *StaticChecker) SetStatus(service string, status Status) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.statuses[service] = status
+}
+
+// Check implements Checker. It's safe to call concurrently with SetStatus.
 func (c *StaticChecker) Check(ctx context.Context, req *CheckRequest) (*CheckResponse, error) {
-	if _, registered := c.services[req.Service]; req.Service == "" || registered {
+	if req.Service == "" {
 		return &CheckResponse{Status: StatusServing}, nil
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if status, registered := c.statuses[req.Service]; registered {
+		return &CheckResponse{Status: status}, nil
 	}
 	return nil, connect.NewError(
 		connect.CodeNotFound,
