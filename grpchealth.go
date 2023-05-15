@@ -169,7 +169,7 @@ func (c *StaticChecker) SetStatus(service string, status Status) {
 }
 
 // Check implements Checker. It's safe to call concurrently with SetStatus.
-func (c *StaticChecker) Check(ctx context.Context, req *CheckRequest) (*CheckResponse, error) {
+func (c *StaticChecker) Check(_ context.Context, req *CheckRequest) (*CheckResponse, error) {
 	if req.Service == "" {
 		return &CheckResponse{Status: StatusServing}, nil
 	}
