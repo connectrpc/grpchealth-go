@@ -36,13 +36,13 @@ import (
 	healthv1 "connectrpc.com/grpchealth/internal/gen/go/connectext/grpc/health/v1"
 )
 
+// HealthV1ServiceName is the fully-qualified name of the v1 version of the health service.
+const HealthV1ServiceName = "grpc.health.v1.Health"
+
 // Status describes the health of a service.
 type Status uint8
 
 const (
-	// HealthV1ServiceName is the fully-qualified name of the v1 version of the health service.
-	HealthV1ServiceName = "grpc.health.v1.Health"
-
 	// StatusUnknown indicates that the service's health state is indeterminate.
 	StatusUnknown Status = 0
 
