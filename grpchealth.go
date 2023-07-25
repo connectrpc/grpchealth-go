@@ -26,33 +26,29 @@
 package grpchealth
 
 import (
-	"context"
-	"errors"
-	"fmt"
 	"net/http"
-	"sync"
 
-	"github.com/bufbuild/connect-go"
-	healthv1 "github.com/bufbuild/connect-grpchealth-go/internal/gen/go/connectext/grpc/health/v1"
+	"connectrpc.com/connect"
+	"connectrpc.com/grpchealth"
 )
 
 // HealthV1ServiceName is the fully-qualified name of the v1 version of the health service.
-const HealthV1ServiceName = "grpc.health.v1.Health"
+const HealthV1ServiceName = grpchealth.HealthV1ServiceName
 
 // Status describes the health of a service.
-type Status uint8
+type Status = grpchealth.Status
 
 const (
 	// StatusUnknown indicates that the service's health state is indeterminate.
-	StatusUnknown Status = 0
+	StatusUnknown = grpchealth.StatusUnknown
 
 	// StatusServing indicates that the service is ready to accept requests.
-	StatusServing Status = 1
+	StatusServing = grpchealth.StatusServing
 
 	// StatusNotServing indicates that the process is healthy but the service is
 	// not accepting requests. For example, StatusNotServing is often appropriate
 	// when your primary database is down or unreachable.
-	StatusNotServing Status = 2
+	StatusNotServing = grpchealth.StatusNotServing
 )
 
 // NewHandler wraps the supplied Checker to build an HTTP handler for gRPC's
@@ -67,54 +63,14 @@ const (
 // https://github.com/grpc/grpc/blob/master/doc/health-checking.md and
 // https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto.
 func NewHandler(checker Checker, options ...connect.HandlerOption) (string, http.Handler) {
-	const serviceName = "/grpc.health.v1.Health/"
-	mux := http.NewServeMux()
-	check := connect.NewUnaryHandler(
-		serviceName+"Check",
-		func(
-			ctx context.Context,
-			req *connect.Request[healthv1.HealthCheckRequest],
-		) (*connect.Response[healthv1.HealthCheckResponse], error) {
-			var checkRequest CheckRequest
-			if req.Msg != nil {
-				checkRequest.Service = req.Msg.Service
-			}
-			checkResponse, err := checker.Check(ctx, &checkRequest)
-			if err != nil {
-				return nil, err
-			}
-			return connect.NewResponse(&healthv1.HealthCheckResponse{
-				Status: healthv1.HealthCheckResponse_ServingStatus(checkResponse.Status),
-			}), nil
-		},
-		options...,
-	)
-	mux.Handle(serviceName+"Check", check)
-	watch := connect.NewServerStreamHandler(
-		serviceName+"Watch",
-		func(
-			_ context.Context,
-			_ *connect.Request[healthv1.HealthCheckRequest],
-			_ *connect.ServerStream[healthv1.HealthCheckResponse],
-		) error {
-			return connect.NewError(
-				connect.CodeUnimplemented,
-				errors.New("connect doesn't support watching health state"),
-			)
-		},
-		options...,
-	)
-	mux.Handle(serviceName+"Watch", watch)
-	return serviceName, mux
+	return grpchealth.NewHandler(checker, options...)
 }
 
 // CheckRequest is a request for the health of a service. When using protobuf,
 // Service will be a fully-qualified service name (for example,
 // "acme.ping.v1.PingService"). If the Service is an empty string, the caller
 // is asking for the health status of whole process.
-type CheckRequest struct {
-	Service string
-}
+type CheckRequest = grpchealth.CheckRequest
 
 // CheckResponse reports the health of a service (or of the whole process). The
 // only valid Status values are StatusUnknown, StatusServing, and
@@ -124,15 +80,11 @@ type CheckRequest struct {
 // Often, systems monitoring health respond to errors by restarting the
 // process. They often respond to StatusNotServing by removing the process from
 // a load balancer pool.
-type CheckResponse struct {
-	Status Status
-}
+type CheckResponse = grpchealth.CheckResponse
 
 // A Checker reports the health of a service. It must be safe to call
 // concurrently.
-type Checker interface {
-	Check(context.Context, *CheckRequest) (*CheckResponse, error)
-}
+type Checker = grpchealth.Checker
 
 // StaticChecker is a simple Checker implementation. It always returns
 // StatusServing for the process, and it returns a static value for each
@@ -141,10 +93,7 @@ type Checker interface {
 // If you have a dynamic list of services, want to ping a database as part of
 // your health check, or otherwise need something more specialized, you should
 // write a custom Checker implementation.
-type StaticChecker struct {
-	mu       sync.RWMutex
-	statuses map[string]Status
-}
+type StaticChecker = grpchealth.StaticChecker
 
 // NewStaticChecker constructs a StaticChecker. By default, each of the
 // supplied services has StatusServing.
@@ -153,33 +102,5 @@ type StaticChecker struct {
 // example, "acme.user.v1.UserService"). Generated Connect service files
 // have this declared as a constant.
 func NewStaticChecker(services ...string) *StaticChecker {
-	statuses := make(map[string]Status, len(services))
-	for _, service := range services {
-		statuses[service] = StatusServing
-	}
-	return &StaticChecker{statuses: statuses}
-}
-
-// SetStatus sets the health status of a service, registering a new service if
-// necessary. It's safe to call SetStatus and Check concurrently.
-func (c *StaticChecker) SetStatus(service string, status Status) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.statuses[service] = status
-}
-
-// Check implements Checker. It's safe to call concurrently with SetStatus.
-func (c *StaticChecker) Check(_ context.Context, req *CheckRequest) (*CheckResponse, error) {
-	if req.Service == "" {
-		return &CheckResponse{Status: StatusServing}, nil
-	}
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if status, registered := c.statuses[req.Service]; registered {
-		return &CheckResponse{Status: status}, nil
-	}
-	return nil, connect.NewError(
-		connect.CodeNotFound,
-		fmt.Errorf("unknown service %s", req.Service),
-	)
+	return grpchealth.NewStaticChecker(services...)
 }

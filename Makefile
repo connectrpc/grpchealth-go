@@ -35,21 +35,16 @@ build: generate ## Build all packages
 	$(GO) build ./...
 
 .PHONY: lint
-lint: $(BIN)/golangci-lint $(BIN)/buf ## Lint Go and protobuf
-	test -z "$$($(BIN)/buf format -d . | tee /dev/stderr)"
+lint: $(BIN)/golangci-lint ## Lint Go and protobuf
 	$(GO) vet ./...
 	$(BIN)/golangci-lint run
-	$(BIN)/buf lint
 
 .PHONY: lintfix
-lintfix: $(BIN)/golangci-lint $(BIN)/buf ## Automatically fix some lint errors
+lintfix: $(BIN)/golangci-lint ## Automatically fix some lint errors
 	$(BIN)/golangci-lint run --fix
-	$(BIN)/buf format -w .
 
 .PHONY: generate
-generate: $(BIN)/buf $(BIN)/protoc-gen-go $(BIN)/license-header ## Regenerate code and licenses
-	rm -rf internal/gen
-	PATH=$(BIN) $(BIN)/buf generate
+generate: $(BIN)/license-header ## Regenerate code and licenses
 	@# We want to operate on a list of modified and new files, excluding
 	@# deleted and ignored files. git-ls-files can't do this alone. comm -23 takes
 	@# two files and prints the union, dropping lines common to both (-3) and
@@ -73,10 +68,6 @@ checkgenerate:
 	@# Used in CI to verify that `make generate` doesn't produce a diff.
 	test -z "$$(git status --porcelain | tee /dev/stderr)"
 
-$(BIN)/buf: Makefile
-	@mkdir -p $(@D)
-	GOBIN=$(abspath $(@D)) $(GO) install github.com/bufbuild/buf/cmd/buf@v1.17.0
-
 $(BIN)/license-header: Makefile
 	@mkdir -p $(@D)
 	GOBIN=$(abspath $(@D)) $(GO) install \
@@ -85,7 +76,3 @@ $(BIN)/license-header: Makefile
 $(BIN)/golangci-lint: Makefile
 	@mkdir -p $(@D)
 	GOBIN=$(abspath $(@D)) $(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.52.2
-
-$(BIN)/protoc-gen-go: Makefile
-	@mkdir -p $(@D)
-	GOBIN=$(abspath $(@D)) $(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@v1.30.0
