@@ -57,7 +57,7 @@ This module is stable. It supports:
 * The [two most recent major releases][go-support-policy] of Go.
 * [APIv2] of Protocol Buffers in Go (`google.golang.org/protobuf`).
 
-Within those parameters, `connect-grpchealth-go` follows semantic versioning.
+Within those parameters, `grpchealth` follows semantic versioning.
 We will _not_ make breaking changes in the 1.x series of releases.
 
 ## Legal
