@@ -20,7 +20,7 @@ you to accept the CLA when you open your pull request.
 ```
 mkdir -p $GOPATH/src/connectrpc.com/grpchealth
 cd $GOPATH/src/connectrpc.com
-git clone git@github.com:connectrpc/grpchealth-go.git grpchealth
+git clone git@github.com:your_github_username/grpchealth-go.git grpchealth
 cd grpchealth
 git remote add upstream https://github.com/connectrpc/grpchealth-go.git
 git fetch upstream
