@@ -30,6 +30,7 @@ linters:
   disable:
     - cyclop            # covered by gocyclo
     - deadcode          # abandoned
+    - depguard          # unnecessary for small libraries
     - exhaustivestruct  # replaced by exhaustruct
     - funlen            # rely on code review to limit function length
     - gocognit          # dubious "cognitive overhead" quantification
