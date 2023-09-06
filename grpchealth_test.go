@@ -19,11 +19,31 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"connectrpc.com/connect"
 	healthv1 "connectrpc.com/grpchealth/internal/gen/go/connectext/grpc/health/v1"
 )
+
+func TestCode(t *testing.T) {
+	t.Parallel()
+	// Since we only have 3 codes we can hardcode them
+	valid := map[Status]bool{
+		StatusUnknown:    true,
+		StatusServing:    true,
+		StatusNotServing: true,
+		Status(128):      false,
+	}
+
+	// Ensures we don't forget to update the [fmt.Stringer] methods.
+	for status, wantValid := range valid {
+		got := status.String()
+		if gotValid := !strings.HasPrefix(got, "status_"); wantValid != gotValid {
+			t.Errorf("status.String() = %v, valid = %v, want valid = %v", got, gotValid, wantValid)
+		}
+	}
+}
 
 func TestHealth(t *testing.T) {
 	const (

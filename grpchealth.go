@@ -55,6 +55,20 @@ const (
 	StatusNotServing Status = 2
 )
 
+// String representation of the status.
+func (s Status) String() string {
+	switch s {
+	case StatusUnknown:
+		return "unknown"
+	case StatusServing:
+		return "serving"
+	case StatusNotServing:
+		return "not_serving"
+	}
+
+	return fmt.Sprintf("status_%d", s)
+}
+
 // NewHandler wraps the supplied Checker to build an HTTP handler for gRPC's
 // health-checking API. It returns the path on which to mount the handler and
 // the HTTP handler itself.
