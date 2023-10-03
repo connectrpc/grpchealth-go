@@ -19,11 +19,38 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"testing/quick"
 
 	"connectrpc.com/connect"
 	healthv1 "connectrpc.com/grpchealth/internal/gen/go/connectext/grpc/health/v1"
 )
+
+func TestCode(t *testing.T) {
+	t.Parallel()
+
+	knownStatuses := map[Status]struct{}{
+		StatusUnknown:    {},
+		StatusServing:    {},
+		StatusNotServing: {},
+	}
+	check := func(s Status) bool {
+		got := s.String()
+		_, known := knownStatuses[s]
+		return known != strings.HasPrefix(got, "status_")
+	}
+	// always check named statuses
+	for status := range knownStatuses {
+		if !check(status) {
+			t.Fatalf("expected string representation of %q to be customized", status)
+		}
+	}
+	// probabilistically explore other statuses
+	if err := quick.Check(check, nil /* config */); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestHealth(t *testing.T) {
 	const (
