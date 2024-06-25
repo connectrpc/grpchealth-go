@@ -4,6 +4,7 @@ grpchealth
 [![Build](https://github.com/connectrpc/grpchealth-go/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/connectrpc/grpchealth-go/actions/workflows/ci.yaml)
 [![Report Card](https://goreportcard.com/badge/connectrpc.com/grpchealth)](https://goreportcard.com/report/connectrpc.com/grpchealth)
 [![GoDoc](https://pkg.go.dev/badge/connectrpc.com/grpchealth.svg)](https://pkg.go.dev/connectrpc.com/grpchealth)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fconnectrpc%2Fgrpchealth-go.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fconnectrpc%2Fgrpchealth-go?ref=badge_shield)
 
 `connectrpc.com/grpchealth` adds support for gRPC-style health checks to any
 `net/http` server &mdash; including those built with [Connect][connect]. By
@@ -76,3 +77,7 @@ Offered under the [Apache 2 license][license].
 [grpcurl]: https://github.com/fullstorydev/grpcurl
 [k8s-liveness]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-grpc-liveness-probe
 [license]: https://github.com/connectrpc/grpchealth-go/blob/main/LICENSE.txt
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fconnectrpc%2Fgrpchealth-go.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fconnectrpc%2Fgrpchealth-go?ref=badge_large)
