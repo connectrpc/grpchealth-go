@@ -83,7 +83,7 @@ func TestHealth(t *testing.T) {
 			connect.NewRequest(&healthv1.HealthCheckRequest{Service: service}),
 		)
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 		if Status(res.Msg.Status) != expect {
 			t.Fatalf("got status %v, expected %v", res.Msg.Status, expect)
@@ -130,7 +130,7 @@ func TestHealth(t *testing.T) {
 		connect.NewRequest(&healthv1.HealthCheckRequest{Service: userFQN}),
 	)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 	defer stream.Close()
 	if ok := stream.Receive(); ok {
