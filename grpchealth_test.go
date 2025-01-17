@@ -60,7 +60,13 @@ func TestHealth(t *testing.T) {
 	t.Parallel()
 	mux := http.NewServeMux()
 	checker := NewStaticChecker(userFQN)
-	mux.Handle(NewHandler(checker))
+	// We wrap the checker in a type that doesn't provide the Watch
+	// method so that we can test that the Watch method returns an
+	// "unimplemented" error in this scenario.
+	type checkerWithoutWatch struct {
+		Checker
+	}
+	mux.Handle(NewHandler(checkerWithoutWatch{checker}))
 	server := httptest.NewUnstartedServer(mux)
 	server.EnableHTTP2 = true
 	server.StartTLS()
@@ -68,7 +74,7 @@ func TestHealth(t *testing.T) {
 
 	client := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
 		server.Client(),
-		server.URL+"/grpc.health.v1.Health/Check",
+		server.URL+checkMethodURIPath,
 		connect.WithGRPC(),
 	)
 
@@ -122,7 +128,7 @@ func TestHealth(t *testing.T) {
 
 	watcher := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
 		server.Client(),
-		server.URL+"/grpc.health.v1.Health/Watch",
+		server.URL+watchMethodURIPath,
 		connect.WithGRPC(),
 	)
 	stream, err := watcher.CallServerStream(
