@@ -111,6 +111,10 @@ func TestHealth(t *testing.T) {
 	}
 
 	assertStatus(t, "" /* process */, StatusServing)
+	checker.SetStatus("", StatusNotServing)
+	assertStatus(t, "", StatusNotServing)
+	checker.SetStatus("", StatusServing)
+	assertStatus(t, "", StatusServing)
 
 	assertStatus(t, userFQN, StatusServing)
 	checker.SetStatus(userFQN, StatusNotServing)
