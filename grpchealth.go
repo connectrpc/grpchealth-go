@@ -176,6 +176,11 @@ func NewStaticChecker(services ...string) *StaticChecker {
 
 // SetStatus sets the health status of a service, registering a new service if
 // necessary. It's safe to call SetStatus and Check concurrently.
+//
+// If the given service name is empty, it sets a server-wide status that is
+// returned to check requests that do not request a particular service. If no
+// such status is ever set, checks that do not request a particular service
+// will get a response of StatusServing.
 func (c *StaticChecker) SetStatus(service string, status Status) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -184,13 +189,13 @@ func (c *StaticChecker) SetStatus(service string, status Status) {
 
 // Check implements Checker. It's safe to call concurrently with SetStatus.
 func (c *StaticChecker) Check(_ context.Context, req *CheckRequest) (*CheckResponse, error) {
-	if req.Service == "" {
-		return &CheckResponse{Status: StatusServing}, nil
-	}
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if status, registered := c.statuses[req.Service]; registered {
 		return &CheckResponse{Status: status}, nil
+	}
+	if req.Service == "" {
+		return &CheckResponse{Status: StatusServing}, nil
 	}
 	return nil, connect.NewError(
 		connect.CodeNotFound,
