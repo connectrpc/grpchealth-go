@@ -85,8 +85,8 @@ func TestHealth(t *testing.T) {
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		if Status(res.Msg.Status) != expect {
-			t.Fatalf("got status %v, expected %v", res.Msg.Status, expect)
+		if Status(res.Msg.GetStatus()) != expect { //nolint:gosec // Conversion is safe here
+			t.Fatalf("got status %v, expected %v", res.Msg.GetStatus(), expect)
 		}
 	}
 	assertUnknown := func(

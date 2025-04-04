@@ -91,7 +91,7 @@ func NewHandler(checker Checker, options ...connect.HandlerOption) (string, http
 		) (*connect.Response[healthv1.HealthCheckResponse], error) {
 			var checkRequest CheckRequest
 			if req.Msg != nil {
-				checkRequest.Service = req.Msg.Service
+				checkRequest.Service = req.Msg.GetService()
 			}
 			checkResponse, err := checker.Check(ctx, &checkRequest)
 			if err != nil {
