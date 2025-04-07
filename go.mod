@@ -1,6 +1,6 @@
 module connectrpc.com/grpchealth
 
-go 1.23
+go 1.23.0
 
 retract v1.1.1 // module cache poisoned, use v1.1.2
 
