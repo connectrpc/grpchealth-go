@@ -16,11 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-      go-version:
-      - name: latest
-        version: 1.24.x
-      - name: previous
-        version: 1.23.x
+        go-version:
+        - name: latest
+          version: 1.24.x
+        - name: previous
+          version: 1.23.x
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
