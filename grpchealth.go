@@ -73,9 +73,9 @@ func (s Status) String() string {
 // health-checking API. It returns the path on which to mount the handler and
 // the HTTP handler itself.
 //
-// Note that the returned handler only supports the unary Check method, not the
-// streaming Watch. As suggested in gRPC's health schema, it returns
-// connect.CodeUnimplemented for the Watch method.
+// If the Checker also implements [Watcher], the streaming Watch RPC is
+// enabled. Otherwise, Watch returns connect.CodeUnimplemented as suggested
+// in gRPC's health schema.
 //
 // For more details on gRPC's health checking protocol, see
 // https://github.com/grpc/grpc/blob/master/doc/health-checking.md and
@@ -104,21 +104,33 @@ func NewHandler(checker Checker, options ...connect.HandlerOption) (string, http
 		options...,
 	)
 	mux.Handle(serviceName+"Check", check)
-	watch := connect.NewServerStreamHandler(
+	watcher, isWatcher := checker.(Watcher)
+	watchHandler := connect.NewServerStreamHandler(
 		serviceName+"Watch",
 		func(
-			_ context.Context,
-			_ *connect.Request[healthv1.HealthCheckRequest],
-			_ *connect.ServerStream[healthv1.HealthCheckResponse],
+			ctx context.Context,
+			req *connect.Request[healthv1.HealthCheckRequest],
+			stream *connect.ServerStream[healthv1.HealthCheckResponse],
 		) error {
-			return connect.NewError(
-				connect.CodeUnimplemented,
-				errors.New("connect doesn't support watching health state"),
-			)
+			if !isWatcher {
+				return connect.NewError(
+					connect.CodeUnimplemented,
+					errors.New("watching health state is not supported"),
+				)
+			}
+			var checkRequest CheckRequest
+			if req.Msg != nil {
+				checkRequest.Service = req.Msg.GetService()
+			}
+			return watcher.Watch(ctx, &checkRequest, func(resp *CheckResponse) error {
+				return stream.Send(&healthv1.HealthCheckResponse{
+					Status: healthv1.HealthCheckResponse_ServingStatus(resp.Status),
+				})
+			})
 		},
 		options...,
 	)
-	mux.Handle(serviceName+"Watch", watch)
+	mux.Handle(serviceName+"Watch", watchHandler)
 	return serviceName, mux
 }
 
@@ -148,16 +160,32 @@ type Checker interface {
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
 }
 
-// StaticChecker is a simple Checker implementation. It always returns
-// StatusServing for the process, and it returns a static value for each
-// service.
+// A Watcher streams health status changes for a service. If a [Checker] also
+// implements Watcher, [NewHandler] enables the streaming Watch RPC.
+//
+// Watch must send the current status for the requested service immediately,
+// then block and call update for each subsequent status change. For unknown
+// services, Watch should return a connect.CodeNotFound error. Watch must
+// return when ctx is done and must not call update after returning.
+//
+// Implementations must be safe to call concurrently.
+type Watcher interface {
+	Watch(ctx context.Context, req *CheckRequest, update func(*CheckResponse) error) error
+}
+
+// StaticChecker is a simple Checker and [Watcher] implementation. It always
+// returns StatusServing for the process, and it returns a static value for
+// each service. Status changes are broadcast to any active Watch streams.
 //
 // If you have a dynamic list of services, want to ping a database as part of
 // your health check, or otherwise need something more specialized, you should
-// write a custom Checker implementation.
+// write a custom Checker and Watcher implementation.
 type StaticChecker struct {
 	mu       sync.RWMutex
 	statuses map[string]Status
+	// watchers maps service names to the set of active watch channels.
+	// Each channel has capacity 1 to allow non-blocking sends.
+	watchers map[string]map[chan Status]struct{}
 }
 
 // NewStaticChecker constructs a StaticChecker. By default, each of the
@@ -171,23 +199,37 @@ func NewStaticChecker(services ...string) *StaticChecker {
 	for _, service := range services {
 		statuses[service] = StatusServing
 	}
-	return &StaticChecker{statuses: statuses}
+	return &StaticChecker{
+		statuses: statuses,
+		watchers: make(map[string]map[chan Status]struct{}),
+	}
 }
 
 // SetStatus sets the health status of a service, registering a new service if
-// necessary. It's safe to call SetStatus and Check concurrently.
+// necessary. It's safe to call SetStatus, Check, and Watch concurrently.
 //
 // If the given service name is empty, it sets a server-wide status that is
 // returned to check requests that do not request a particular service. If no
 // such status is ever set, checks that do not request a particular service
 // will get a response of StatusServing.
+//
+// Any active Watch streams for the service are notified of the change.
 func (c *StaticChecker) SetStatus(service string, status Status) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.statuses[service] = status
+	for statusChan := range c.watchers[service] {
+		// Drain any pending value before sending to ensure the watcher
+		// always receives the latest status.
+		select {
+		case statusChan <- status:
+		case <-statusChan:
+			statusChan <- status
+		}
+	}
 }
 
-// Check implements Checker. It's safe to call concurrently with SetStatus.
+// Check implements [Checker]. It's safe to call concurrently with SetStatus.
 func (c *StaticChecker) Check(_ context.Context, req *CheckRequest) (*CheckResponse, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -201,4 +243,64 @@ func (c *StaticChecker) Check(_ context.Context, req *CheckRequest) (*CheckRespo
 		connect.CodeNotFound,
 		fmt.Errorf("unknown service %s", req.Service),
 	)
+}
+
+// Watch implements [Watcher]. It sends the current status for the requested
+// service immediately, then blocks and calls update for each subsequent
+// status change until ctx is done.
+func (c *StaticChecker) Watch(ctx context.Context, req *CheckRequest, update func(*CheckResponse) error) error {
+	service := req.Service
+	statusChan := make(chan Status, 1)
+
+	c.mu.Lock()
+	// Send initial status while holding the lock, so no update is missed
+	// between reading the current status and registering the channel.
+	status, registered := c.statuses[service]
+	if !registered {
+		if service == "" {
+			status = StatusServing
+		} else {
+			c.mu.Unlock()
+			return connect.NewError(
+				connect.CodeNotFound,
+				fmt.Errorf("unknown service %s", service),
+			)
+		}
+	}
+
+	if c.watchers[service] == nil {
+		c.watchers[service] = make(map[chan Status]struct{})
+	}
+
+	c.watchers[service][statusChan] = struct{}{}
+	c.mu.Unlock()
+
+	defer func() {
+		c.mu.Lock()
+		delete(c.watchers[service], statusChan)
+		if len(c.watchers[service]) == 0 {
+			delete(c.watchers, service)
+		}
+		c.mu.Unlock()
+	}()
+
+	// Send the initial status outside the lock.
+	if err := update(&CheckResponse{Status: status}); err != nil {
+		return err
+	}
+	lastStatus := status
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case newStatus := <-statusChan:
+			if newStatus != lastStatus {
+				if err := update(&CheckResponse{Status: newStatus}); err != nil {
+					return err
+				}
+				lastStatus = newStatus
+			}
+		}
+	}
 }

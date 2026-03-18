@@ -15,6 +15,7 @@
 package grpchealth
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -37,6 +38,7 @@ func TestCode(t *testing.T) {
 	check := func(s Status) bool {
 		got := s.String()
 		_, known := knownStatuses[s]
+
 		return known != strings.HasPrefix(got, "status_")
 	}
 	// always check named statuses
@@ -122,31 +124,228 @@ func TestHealth(t *testing.T) {
 	assertUnknown(t, unknown)
 	checker.SetStatus(unknown, StatusServing)
 	assertStatus(t, unknown, StatusServing)
+}
+
+func TestWatch(t *testing.T) {
+	t.Parallel()
+
+	checker := NewStaticChecker(
+		"acme.watch.v1.StreamService",
+		"acme.watch.v1.UnknownTest",
+		"acme.watch.v1.EmptyTest",
+		"acme.watch.v1.DuplicateTest",
+	)
+	mux := http.NewServeMux()
+	mux.Handle(NewHandler(checker))
+	server := httptest.NewUnstartedServer(mux)
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	t.Cleanup(server.Close)
+
+	newWatchClient := func() *connect.Client[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse] {
+		return connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
+			server.Client(),
+			server.URL+"/grpc.health.v1.Health/Watch",
+			connect.WithGRPC(),
+		)
+	}
+
+	t.Run("streams status updates", func(t *testing.T) {
+		t.Parallel()
+		const service = "acme.watch.v1.StreamService"
+
+		watcher := newWatchClient()
+		ctx, cancel := context.WithCancel(t.Context())
+
+		stream, err := watcher.CallServerStream(
+			ctx,
+			connect.NewRequest(&healthv1.HealthCheckRequest{Service: service}),
+		)
+		if err != nil {
+			cancel()
+			t.Fatal(err.Error())
+		}
+
+		defer stream.Close()
+		defer cancel()
+
+		// Should receive initial status.
+		if ok := stream.Receive(); !ok {
+			t.Fatalf("expected initial status, got error: %v", stream.Err())
+		}
+
+		if got := Status(stream.Msg().GetStatus()); got != StatusServing { //nolint:gosec // Conversion is safe here
+			t.Fatalf("got initial status %v, expected %v", got, StatusServing)
+		}
+
+		// Change status and expect an update.
+		checker.SetStatus(service, StatusNotServing)
+
+		if ok := stream.Receive(); !ok {
+			t.Fatalf("expected status update, got error: %v", stream.Err())
+		}
+
+		if got := Status(stream.Msg().GetStatus()); got != StatusNotServing { //nolint:gosec // Conversion is safe here
+			t.Fatalf("got status %v, expected %v", got, StatusNotServing)
+		}
+
+		// Change back and expect another update.
+		checker.SetStatus(service, StatusServing)
+
+		if ok := stream.Receive(); !ok {
+			t.Fatalf("expected status update, got error: %v", stream.Err())
+		}
+
+		if got := Status(stream.Msg().GetStatus()); got != StatusServing { //nolint:gosec // Conversion is safe here
+			t.Fatalf("got status %v, expected %v", got, StatusServing)
+		}
+	})
+
+	t.Run("unknown service returns CodeNotFound", func(t *testing.T) {
+		t.Parallel()
+		const service = "acme.watch.v1.NeverRegistered"
+
+		watcher := newWatchClient()
+		stream, err := watcher.CallServerStream(
+			t.Context(),
+			connect.NewRequest(&healthv1.HealthCheckRequest{Service: service}),
+		)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		defer stream.Close()
+
+		if ok := stream.Receive(); ok {
+			t.Fatal("expected error for unknown service, got message")
+		}
+		var connectErr *connect.Error
+		if ok := errors.As(stream.Err(), &connectErr); !ok {
+			t.Fatalf("got %v (%T), expected a *connect.Error", stream.Err(), stream.Err())
+		}
+		if code := connectErr.Code(); code != connect.CodeNotFound {
+			t.Fatalf("got code %v, expected CodeNotFound", code)
+		}
+	})
+
+	t.Run("empty service watches process health", func(t *testing.T) {
+		t.Parallel()
+
+		watcher := newWatchClient()
+		ctx, cancel := context.WithCancel(t.Context())
+
+		stream, err := watcher.CallServerStream(
+			ctx,
+			connect.NewRequest(&healthv1.HealthCheckRequest{Service: ""}),
+		)
+		if err != nil {
+			cancel()
+			t.Fatal(err.Error())
+		}
+
+		defer stream.Close()
+		defer cancel()
+
+		// Empty service defaults to StatusServing.
+		if ok := stream.Receive(); !ok {
+			t.Fatalf("expected initial status, got error: %v", stream.Err())
+		}
+
+		if got := Status(stream.Msg().GetStatus()); got != StatusServing { //nolint:gosec // Conversion is safe here
+			t.Fatalf("got initial status %v, expected %v", got, StatusServing)
+		}
+	})
+
+	t.Run("duplicate status is not sent", func(t *testing.T) {
+		t.Parallel()
+
+		const service = "acme.watch.v1.DuplicateTest"
+
+		watcher := newWatchClient()
+		ctx, cancel := context.WithCancel(t.Context())
+
+		stream, err := watcher.CallServerStream(
+			ctx,
+			connect.NewRequest(&healthv1.HealthCheckRequest{Service: service}),
+		)
+		if err != nil {
+			cancel()
+			t.Fatal(err.Error())
+		}
+
+		defer stream.Close()
+		defer cancel()
+
+		// Receive initial status.
+		if ok := stream.Receive(); !ok {
+			t.Fatalf("expected initial status, got error: %v", stream.Err())
+		}
+		// Set the same status -- should not produce a new message.
+		checker.SetStatus(service, StatusServing)
+		// Set a different status -- this should be the next message.
+		checker.SetStatus(service, StatusNotServing)
+
+		if ok := stream.Receive(); !ok {
+			t.Fatalf("expected status update, got error: %v", stream.Err())
+		}
+
+		if got := Status(stream.Msg().GetStatus()); got != StatusNotServing { //nolint:gosec // Conversion is safe here
+			t.Fatalf("got status %v, expected %v", got, StatusNotServing)
+		}
+	})
+}
+
+func TestWatchUnimplementedWithoutWatcher(t *testing.T) {
+	t.Parallel()
+
+	// Use a checker that does not implement Watcher.
+	checker := checkerFunc(func(_ context.Context, _ *CheckRequest) (*CheckResponse, error) {
+		return &CheckResponse{Status: StatusServing}, nil
+	})
+	mux := http.NewServeMux()
+	mux.Handle(NewHandler(checker))
+	server := httptest.NewUnstartedServer(mux)
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	t.Cleanup(server.Close)
 
 	watcher := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
 		server.Client(),
 		server.URL+"/grpc.health.v1.Health/Watch",
 		connect.WithGRPC(),
 	)
+
 	stream, err := watcher.CallServerStream(
 		t.Context(),
-		connect.NewRequest(&healthv1.HealthCheckRequest{Service: userFQN}),
+		connect.NewRequest(&healthv1.HealthCheckRequest{Service: "anything"}),
 	)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
+
 	defer stream.Close()
+
 	if ok := stream.Receive(); ok {
-		t.Fatalf("got message from Watch")
+		t.Fatalf("got message from Watch, expected error")
 	}
+
 	if stream.Err() == nil {
-		t.Fatalf("expected error from stream")
+		t.Fatal("expected error from stream")
 	}
+
 	var connectErr *connect.Error
 	if ok := errors.As(stream.Err(), &connectErr); !ok {
 		t.Fatalf("got %v (%T), expected a *connect.Error", stream.Err(), stream.Err())
 	}
+
 	if code := connectErr.Code(); code != connect.CodeUnimplemented {
 		t.Fatalf("got code %v, expected CodeUnimplemented", code)
 	}
+}
+
+// checkerFunc adapts a function to the Checker interface without
+// implementing Watcher, useful for testing the unimplemented path.
+type checkerFunc func(context.Context, *CheckRequest) (*CheckResponse, error)
+
+func (f checkerFunc) Check(ctx context.Context, req *CheckRequest) (*CheckResponse, error) {
+	return f(ctx, req)
 }
