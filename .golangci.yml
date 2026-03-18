@@ -12,10 +12,12 @@ linters:
     - maintidx          # covered by gocyclo
     - mnd               # some unnamed constants are okay
     - nlreturn          # generous whitespace violates house style
+    - noinlineerr       # inline error handling is fine
     - nonamedreturns    # named returns are fine; it's *bare* returns that are bad
     - testpackage       # internal tests are fine
     - wrapcheck         # don't _always_ need to wrap errors
     - wsl               # generous whitespace violates house style
+    - wsl_v5            # generous whitespace violates house style
   settings:
     errcheck:
       check-type-assertions: true

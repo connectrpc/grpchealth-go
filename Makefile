@@ -76,7 +76,7 @@ $(BIN)/license-header: Makefile
 
 $(BIN)/golangci-lint: Makefile
 	@mkdir -p $(@D)
-	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.0.2
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.11.3
 
 $(BIN)/protoc-gen-go: Makefile
 	@mkdir -p $(@D)

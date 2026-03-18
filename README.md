@@ -26,8 +26,6 @@ package main
 import (
   "net/http"
 
-  "golang.org/x/net/http2"
-  "golang.org/x/net/http2/h2c"
   "connectrpc.com/grpchealth"
 )
 
@@ -41,12 +39,17 @@ func main() {
     // reference userv1.UserServiceName and groupv1.GroupServiceName.
   )
   mux.Handle(grpchealth.NewHandler(checker))
-  // If you don't need to support HTTP/2 without TLS (h2c), you can drop
-  // x/net/http2 and use http.ListenAndServeTLS instead.
-  http.ListenAndServe(
-    ":8080",
-    h2c.NewHandler(mux, &http2.Server{}),
-  )
+  // If you don't need to support HTTP/2 without TLS (h2c), you can use
+  // http.ListenAndServeTLS instead.
+  protocols := new(http.Protocols)
+  protocols.SetHTTP1(true)
+  protocols.SetUnencryptedHTTP2(true)
+  server := &http.Server{
+    Addr:      ":8080",
+    Handler:   mux,
+    Protocols: protocols,
+  }
+  server.ListenAndServe()
 }
 ```
 
