@@ -15,7 +15,6 @@
 package grpchealth
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -79,7 +78,7 @@ func TestHealth(t *testing.T) {
 	) {
 		t.Helper()
 		res, err := client.CallUnary(
-			context.Background(),
+			t.Context(),
 			connect.NewRequest(&healthv1.HealthCheckRequest{Service: service}),
 		)
 		if err != nil {
@@ -95,7 +94,7 @@ func TestHealth(t *testing.T) {
 	) {
 		t.Helper()
 		_, err := client.CallUnary(
-			context.Background(),
+			t.Context(),
 			connect.NewRequest(&healthv1.HealthCheckRequest{Service: service}),
 		)
 		if err == nil {
@@ -130,7 +129,7 @@ func TestHealth(t *testing.T) {
 		connect.WithGRPC(),
 	)
 	stream, err := watcher.CallServerStream(
-		context.Background(),
+		t.Context(),
 		connect.NewRequest(&healthv1.HealthCheckRequest{Service: userFQN}),
 	)
 	if err != nil {
@@ -145,7 +144,7 @@ func TestHealth(t *testing.T) {
 	}
 	var connectErr *connect.Error
 	if ok := errors.As(stream.Err(), &connectErr); !ok {
-		t.Fatalf("got %v (%T), expected a *connect.Error", err, err)
+		t.Fatalf("got %v (%T), expected a *connect.Error", stream.Err(), stream.Err())
 	}
 	if code := connectErr.Code(); code != connect.CodeUnimplemented {
 		t.Fatalf("got code %v, expected CodeUnimplemented", code)
