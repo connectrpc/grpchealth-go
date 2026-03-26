@@ -30,14 +30,18 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"sync"
 
 	"connectrpc.com/connect"
 	healthv1 "connectrpc.com/grpchealth/internal/gen/go/connectext/grpc/health/v1"
 )
 
-// HealthV1ServiceName is the fully-qualified name of the v1 version of the health service.
-const HealthV1ServiceName = "grpc.health.v1.Health"
+const (
+	// HealthV1ServiceName is the fully-qualified name of the v1 version of the health service.
+	HealthV1ServiceName = "grpc.health.v1.Health"
+
+	checkProcedure = "/" + HealthV1ServiceName + "/Check"
+	watchProcedure = "/" + HealthV1ServiceName + "/Watch"
+)
 
 // Status describes the health of a service.
 type Status uint8
@@ -73,52 +77,30 @@ func (s Status) String() string {
 // health-checking API. It returns the path on which to mount the handler and
 // the HTTP handler itself.
 //
-// Note that the returned handler only supports the unary Check method, not the
-// streaming Watch. As suggested in gRPC's health schema, it returns
-// connect.CodeUnimplemented for the Watch method.
+// If the Checker also implements [Watcher], the returned handler supports the
+// streaming Watch RPC. Otherwise, the Watch method returns
+// connect.CodeUnimplemented.
 //
 // For more details on gRPC's health checking protocol, see
 // https://github.com/grpc/grpc/blob/master/doc/health-checking.md and
 // https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto.
 func NewHandler(checker Checker, options ...connect.HandlerOption) (string, http.Handler) {
-	const serviceName = "/grpc.health.v1.Health/"
+	const serviceName = "/" + HealthV1ServiceName + "/"
+	hdlr := &handler{checker: checker}
+	if watcher, ok := checker.(Watcher); ok {
+		hdlr.watcher = watcher
+	}
 	mux := http.NewServeMux()
-	check := connect.NewUnaryHandler(
-		serviceName+"Check",
-		func(
-			ctx context.Context,
-			req *connect.Request[healthv1.HealthCheckRequest],
-		) (*connect.Response[healthv1.HealthCheckResponse], error) {
-			var checkRequest CheckRequest
-			if req.Msg != nil {
-				checkRequest.Service = req.Msg.GetService()
-			}
-			checkResponse, err := checker.Check(ctx, &checkRequest)
-			if err != nil {
-				return nil, err
-			}
-			return connect.NewResponse(&healthv1.HealthCheckResponse{
-				Status: healthv1.HealthCheckResponse_ServingStatus(checkResponse.Status),
-			}), nil
-		},
+	mux.Handle(checkProcedure, connect.NewUnaryHandler(
+		checkProcedure,
+		hdlr.check,
 		options...,
-	)
-	mux.Handle(serviceName+"Check", check)
-	watch := connect.NewServerStreamHandler(
-		serviceName+"Watch",
-		func(
-			_ context.Context,
-			_ *connect.Request[healthv1.HealthCheckRequest],
-			_ *connect.ServerStream[healthv1.HealthCheckResponse],
-		) error {
-			return connect.NewError(
-				connect.CodeUnimplemented,
-				errors.New("connect doesn't support watching health state"),
-			)
-		},
+	))
+	mux.Handle(watchProcedure, connect.NewServerStreamHandler(
+		watchProcedure,
+		hdlr.watch,
 		options...,
-	)
-	mux.Handle(serviceName+"Watch", watch)
+	))
 	return serviceName, mux
 }
 
@@ -148,57 +130,105 @@ type Checker interface {
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
 }
 
-// StaticChecker is a simple Checker implementation. It always returns
-// StatusServing for the process, and it returns a static value for each
-// service.
-//
-// If you have a dynamic list of services, want to ping a database as part of
-// your health check, or otherwise need something more specialized, you should
-// write a custom Checker implementation.
-type StaticChecker struct {
-	mu       sync.RWMutex
-	statuses map[string]Status
+// A Watcher extends Checker with the ability to notify the caller when the
+// health status of a service changes. When a Checker also implements Watcher,
+// the handler returned by [NewHandler] supports the streaming Watch RPC.
+type Watcher interface {
+	Checker
+
+	// Watch monitors the health of the requested service and calls onChange
+	// whenever the status may have changed. Implementations should return
+	// quickly rather than blocking. They may return an error if the request
+	// cannot be satisfied (for example, if the service is unknown). The
+	// context is only used for the duration of the Watch call itself; it
+	// does not govern the lifetime of the watch.
+	//
+	// The returned stop function tells the implementation to stop calling
+	// onChange. However, if two goroutines are racing, one calling stop and
+	// the other calling onChange, this is fine. In other words, it is not
+	// an error if onChange gets called after stop; but stop should arrange
+	// for calls to onChange to cease.
+	Watch(ctx context.Context, req *CheckRequest, onChange func()) (stop func(), err error)
 }
 
-// NewStaticChecker constructs a StaticChecker. By default, each of the
-// supplied services has StatusServing.
-//
-// The supplied strings should be fully-qualified protobuf service names (for
-// example, "acme.user.v1.UserService"). Generated Connect service files
-// have this declared as a constant.
-func NewStaticChecker(services ...string) *StaticChecker {
-	statuses := make(map[string]Status, len(services))
-	for _, service := range services {
-		statuses[service] = StatusServing
-	}
-	return &StaticChecker{statuses: statuses}
+type handler struct {
+	checker Checker
+	watcher Watcher // nil if checker does not implement Watcher
 }
 
-// SetStatus sets the health status of a service, registering a new service if
-// necessary. It's safe to call SetStatus and Check concurrently.
-//
-// If the given service name is empty, it sets a server-wide status that is
-// returned to check requests that do not request a particular service. If no
-// such status is ever set, checks that do not request a particular service
-// will get a response of StatusServing.
-func (c *StaticChecker) SetStatus(service string, status Status) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.statuses[service] = status
+func (h *handler) check(
+	ctx context.Context,
+	req *connect.Request[healthv1.HealthCheckRequest],
+) (*connect.Response[healthv1.HealthCheckResponse], error) {
+	var checkRequest CheckRequest
+	if req.Msg != nil {
+		checkRequest.Service = req.Msg.GetService()
+	}
+	checkResponse, err := h.checker.Check(ctx, &checkRequest)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&healthv1.HealthCheckResponse{
+		Status: healthv1.HealthCheckResponse_ServingStatus(checkResponse.Status),
+	}), nil
 }
 
-// Check implements Checker. It's safe to call concurrently with SetStatus.
-func (c *StaticChecker) Check(_ context.Context, req *CheckRequest) (*CheckResponse, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if status, registered := c.statuses[req.Service]; registered {
-		return &CheckResponse{Status: status}, nil
+func (h *handler) watch(
+	ctx context.Context,
+	req *connect.Request[healthv1.HealthCheckRequest],
+	stream *connect.ServerStream[healthv1.HealthCheckResponse],
+) error {
+	if h.watcher == nil {
+		return connect.NewError(
+			connect.CodeUnimplemented,
+			errors.New("watching health state is not supported"),
+		)
 	}
-	if req.Service == "" {
-		return &CheckResponse{Status: StatusServing}, nil
+	var checkRequest CheckRequest
+	checkRequest.Service = req.Msg.GetService()
+	changed := make(chan struct{}, 1)
+	stop, err := h.watcher.Watch(ctx, &checkRequest, func() {
+		select {
+		case changed <- struct{}{}:
+		default:
+		}
+	})
+	if err != nil {
+		return err
 	}
-	return nil, connect.NewError(
-		connect.CodeNotFound,
-		fmt.Errorf("unknown service %s", req.Service),
-	)
+	defer stop()
+	// Send the current status immediately.
+	var lastStatus healthv1.HealthCheckResponse_ServingStatus
+	if err := h.checkAndSend(ctx, &checkRequest, stream, &lastStatus, true); err != nil {
+		return err
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-changed:
+			if err := h.checkAndSend(ctx, &checkRequest, stream, &lastStatus, false); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+func (h *handler) checkAndSend(
+	ctx context.Context,
+	req *CheckRequest,
+	stream *connect.ServerStream[healthv1.HealthCheckResponse],
+	lastStatus *healthv1.HealthCheckResponse_ServingStatus,
+	forceSend bool,
+) error {
+	checkResponse, err := h.checker.Check(ctx, req)
+	if err != nil {
+		return err
+	}
+	status := healthv1.HealthCheckResponse_ServingStatus(checkResponse.Status)
+	if status == *lastStatus && !forceSend {
+		return nil
+	}
+	*lastStatus = status
+	return stream.Send(&healthv1.HealthCheckResponse{Status: status})
 }
