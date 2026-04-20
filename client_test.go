@@ -15,8 +15,8 @@
 package grpchealth
 
 import (
+	"context"
 	"errors"
-	"iter"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -90,44 +90,37 @@ func TestClient_Watch(t *testing.T) {
 
 	client := NewClient(server.Client(), server.URL, connect.WithGRPC())
 
-	// Use iter.Pull2 to step through the Watch iterator, so we can
-	// interleave SetStatus calls between receives.
-	watchIter, stop := client.Watch(t.Context(), &CheckRequest{Service: userFQN})
-	defer stop()
-	next, pullStop := iter.Pull2(watchIter)
-	defer pullStop()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	events := client.Watch(ctx, &CheckRequest{Service: userFQN})
 
-	pull := func(t *testing.T, expect Status) {
+	recv := func(t *testing.T, expect Status) {
 		t.Helper()
-		resp, err, ok := next()
+		event, ok := <-events
 		if !ok {
-			t.Fatal("iterator stopped unexpectedly")
+			t.Fatal("channel closed unexpectedly")
 		}
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		if event.Err != nil {
+			t.Fatalf("unexpected error: %v", event.Err)
 		}
-		if resp.Status != expect {
-			t.Fatalf("got status %v, expected %v", resp.Status, expect)
+		if event.Response.Status != expect {
+			t.Fatalf("got status %v, expected %v", event.Response.Status, expect)
 		}
 	}
 
 	// First status is delivered immediately.
-	pull(t, StatusServing)
+	recv(t, StatusServing)
 
-	// Status transitions propagate through the iterator.
+	// Status transitions propagate through the channel.
 	checker.SetStatus(userFQN, StatusNotServing)
-	pull(t, StatusNotServing)
+	recv(t, StatusNotServing)
 
 	checker.SetStatus(userFQN, StatusServing)
-	pull(t, StatusServing)
+	recv(t, StatusServing)
 
-	// Stopping cancels the stream; the iterator drains.
-	stop()
-	for {
-		_, _, ok := next()
-		if !ok {
-			break
-		}
+	// Canceling the context closes the channel.
+	cancel()
+	for range events { //nolint:revive // Drain until the channel closes.
 	}
 }
 
@@ -143,18 +136,23 @@ func TestClient_Watch_unknownService(t *testing.T) {
 
 	client := NewClient(server.Client(), server.URL, connect.WithGRPC())
 
-	watchIter, stop := client.Watch(t.Context(), &CheckRequest{Service: "unknown.Service"})
-	defer stop()
-	for resp, err := range watchIter {
-		if err == nil {
-			t.Fatalf("expected error, got response: %v", resp)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	gotErr := false
+	for event := range client.Watch(ctx, &CheckRequest{Service: "unknown.Service"}) {
+		if event.Err == nil {
+			t.Fatalf("expected error, got response: %v", event.Response)
 		}
 		var connectErr *connect.Error
-		if !errors.As(err, &connectErr) {
-			t.Fatalf("got %v (%T), expected a *connect.Error", err, err)
+		if !errors.As(event.Err, &connectErr) {
+			t.Fatalf("got %v (%T), expected a *connect.Error", event.Err, event.Err)
 		}
 		if code := connectErr.Code(); code != connect.CodeNotFound {
 			t.Fatalf("got code %v, expected CodeNotFound", code)
 		}
+		gotErr = true
+	}
+	if !gotErr {
+		t.Fatal("channel closed without delivering an error event")
 	}
 }

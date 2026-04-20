@@ -16,7 +16,6 @@ package grpchealth
 
 import (
 	"context"
-	"iter"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -70,32 +69,49 @@ func (c *Client) Check(ctx context.Context, req *CheckRequest) (*CheckResponse, 
 	}, nil
 }
 
-// Watch returns an iterator over health status changes for the requested
-// service, and a stop function that cancels the underlying stream. The
-// iterator yields a [*CheckResponse] and an error for each received message.
-// When an error is yielded, it is the final value; the iterator terminates
-// immediately after.
+// WatchEvent is a single update delivered by [Client.Watch]. Exactly one of
+// Response or Err is set. An Err event, when delivered, is the final event on
+// the channel.
+type WatchEvent struct {
+	Response *CheckResponse
+	Err      error
+}
+
+// Watch streams health status changes for the requested service. Status
+// updates are delivered on the returned channel. The channel closes when the
+// stream ends, either because ctx is canceled, the server terminates the
+// stream, or an error occurs. If the stream terminates with an error and ctx
+// has not been canceled, the final value on the channel has its Err field
+// set.
 //
-// Callers must defer the stop function to release the stream resources:
+// Callers cancel ctx to stop the stream and release resources:
 //
-//	watchIter, stop := client.Watch(ctx, &CheckRequest{Service: svc})
-//	defer stop()
-//	for resp, err := range watchIter {
-//	    if err != nil {
-//	        // Handle error; this is the last iteration.
+//	ctx, cancel := context.WithCancel(ctx)
+//	defer cancel()
+//	for event := range client.Watch(ctx, &CheckRequest{Service: svc}) {
+//	    if event.Err != nil {
+//	        // Handle error; this is the final event.
 //	        break
 //	    }
-//	    fmt.Println(resp.Status)
+//	    fmt.Println(event.Response.Status)
 //	}
-func (c *Client) Watch(ctx context.Context, req *CheckRequest) (seq iter.Seq2[*CheckResponse, error], stop func()) {
-	ctx, cancel := context.WithCancel(ctx)
-	return func(yield func(*CheckResponse, error) bool) {
-		defer cancel()
+func (c *Client) Watch(ctx context.Context, req *CheckRequest) <-chan WatchEvent {
+	events := make(chan WatchEvent)
+	go func() {
+		defer close(events)
+		send := func(event WatchEvent) bool {
+			select {
+			case <-ctx.Done():
+				return false
+			case events <- event:
+				return true
+			}
+		}
 		stream, err := c.watch.CallServerStream(ctx, connect.NewRequest(&healthv1.HealthCheckRequest{
 			Service: req.Service,
 		}))
 		if err != nil {
-			yield(nil, err)
+			send(WatchEvent{Err: err})
 			return
 		}
 		defer stream.Close()
@@ -103,12 +119,13 @@ func (c *Client) Watch(ctx context.Context, req *CheckRequest) (seq iter.Seq2[*C
 			resp := &CheckResponse{
 				Status: Status(stream.Msg().GetStatus()), //nolint:gosec // Conversion is safe; Status and ServingStatus share the same value space.
 			}
-			if !yield(resp, nil) {
+			if !send(WatchEvent{Response: resp}) {
 				return
 			}
 		}
 		if err := stream.Err(); err != nil {
-			yield(nil, err)
+			send(WatchEvent{Err: err})
 		}
-	}, cancel
+	}()
+	return events
 }
