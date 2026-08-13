@@ -16,10 +16,11 @@ package grpchealth
 
 import (
 	"context"
-	"strings"
+	"errors"
+	"io"
 
-	"connectrpc.com/connect"
-	healthv1 "connectrpc.com/grpchealth/internal/gen/go/connectext/grpc/health/v1"
+	"connectrpc.com/connect/v2"
+	healthv1 "connectrpc.com/grpchealth/v2/internal/gen/go/connectext/grpc/health/v1"
 )
 
 // Compile-time assertion: *Client implements Checker.
@@ -28,29 +29,27 @@ var _ Checker = (*Client)(nil)
 // Client calls the gRPC health-checking API. It implements [Checker], so it
 // can be used anywhere a Checker is expected. It is safe to use concurrently.
 type Client struct {
-	check *connect.Client[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse]
-	watch *connect.Client[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse]
+	client *connect.Client
+	check  connect.Spec
+	watch  connect.Spec
 }
 
 // NewClient constructs a new Client for the gRPC health-checking API.
 //
-// The URL supplied should be the base URL of the Connect or gRPC server (for
-// example, https://api.example.com). By default the client uses the Connect
-// protocol with the binary Protobuf codec. To use the gRPC protocol, supply
-// [connect.WithGRPC] as an option.
-func NewClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) *Client {
-	baseURL = strings.TrimRight(baseURL, "/")
+// By default, transports use the Connect protocol with the binary Protobuf
+// codec. To use the gRPC protocol, configure the transport with
+// [connectrpc.com/connect/v2/connecthttp.WithGRPC].
+func NewClient(client *connect.Client) *Client {
 	return &Client{
-		check: connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
-			httpClient,
-			baseURL+checkProcedure,
-			opts...,
-		),
-		watch: connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
-			httpClient,
-			baseURL+watchProcedure,
-			opts...,
-		),
+		client: client,
+		check: connect.Spec{
+			StreamType: connect.StreamTypeUnary,
+			Procedure:  checkProcedure,
+		},
+		watch: connect.Spec{
+			StreamType: connect.StreamTypeServer,
+			Procedure:  watchProcedure,
+		},
 	}
 }
 
@@ -58,14 +57,14 @@ func NewClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.Cl
 // requests the health of the whole server process. If the service is unknown,
 // the returned error will have [connect.CodeNotFound].
 func (c *Client) Check(ctx context.Context, req *CheckRequest) (*CheckResponse, error) {
-	res, err := c.check.CallUnary(ctx, connect.NewRequest(&healthv1.HealthCheckRequest{
+	var res healthv1.HealthCheckResponse
+	if err := c.client.CallUnary(ctx, c.check, &healthv1.HealthCheckRequest{
 		Service: req.Service,
-	}))
-	if err != nil {
+	}, &res); err != nil {
 		return nil, err
 	}
 	return &CheckResponse{
-		Status: Status(res.Msg.GetStatus()), //nolint:gosec // Conversion is safe; Status and ServingStatus share the same value space.
+		Status: Status(res.GetStatus()), //nolint:gosec // Conversion is safe; Status and ServingStatus share the same value space.
 	}, nil
 }
 
@@ -107,24 +106,28 @@ func (c *Client) Watch(ctx context.Context, req *CheckRequest) <-chan WatchEvent
 				return true
 			}
 		}
-		stream, err := c.watch.CallServerStream(ctx, connect.NewRequest(&healthv1.HealthCheckRequest{
+		stream, err := c.client.CallServerStream(ctx, c.watch, &healthv1.HealthCheckRequest{
 			Service: req.Service,
-		}))
+		})
 		if err != nil {
 			send(WatchEvent{Err: err})
 			return
 		}
 		defer stream.Close()
-		for stream.Receive() {
+		for {
+			var res healthv1.HealthCheckResponse
+			if err := stream.Receive(&res); err != nil {
+				if !errors.Is(err, io.EOF) {
+					send(WatchEvent{Err: err})
+				}
+				return
+			}
 			resp := &CheckResponse{
-				Status: Status(stream.Msg().GetStatus()), //nolint:gosec // Conversion is safe; Status and ServingStatus share the same value space.
+				Status: Status(res.GetStatus()), //nolint:gosec // Conversion is safe; Status and ServingStatus share the same value space.
 			}
 			if !send(WatchEvent{Response: resp}) {
 				return
 			}
-		}
-		if err := stream.Err(); err != nil {
-			send(WatchEvent{Err: err})
 		}
 	}()
 	return events

@@ -3,7 +3,7 @@ managed:
   enabled: true
   override:
     - file_option: go_package_prefix
-      value: connectrpc.com/grpchealth/internal/gen/go
+      value: connectrpc.com/grpchealth/v2/internal/gen/go
 plugins:
   - local: protoc-gen-go
     out: internal/gen/go

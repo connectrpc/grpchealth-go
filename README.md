@@ -2,13 +2,13 @@ grpchealth
 ==========
 
 [![Build](https://github.com/connectrpc/grpchealth-go/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/connectrpc/grpchealth-go/actions/workflows/ci.yaml)
-[![Report Card](https://goreportcard.com/badge/connectrpc.com/grpchealth)](https://goreportcard.com/report/connectrpc.com/grpchealth)
-[![GoDoc](https://pkg.go.dev/badge/connectrpc.com/grpchealth.svg)](https://pkg.go.dev/connectrpc.com/grpchealth)
+[![Report Card](https://goreportcard.com/badge/connectrpc.com/grpchealth/v2)](https://goreportcard.com/report/connectrpc.com/grpchealth/v2)
+[![GoDoc](https://pkg.go.dev/badge/connectrpc.com/grpchealth/v2.svg)](https://pkg.go.dev/connectrpc.com/grpchealth/v2)
 
-`connectrpc.com/grpchealth` adds support for gRPC-style health checks to any
-`net/http` server &mdash; including those built with [Connect][connect]. By
-polling this API, load balancers, container orchestrators, and other
-infrastructure systems can respond to changes in your HTTP server's health.
+`connectrpc.com/grpchealth/v2` adds support for gRPC-style health checks to
+servers built with [Connect][connect]. By polling this API, load balancers,
+container orchestrators, and other infrastructure systems can respond to
+changes in your server's health.
 
 The exposed health checking API is wire compatible with Google's gRPC
 implementations, so it works with [grpcurl], [grpc-health-probe], and
@@ -26,7 +26,9 @@ package main
 import (
   "net/http"
 
-  "connectrpc.com/grpchealth"
+  "connectrpc.com/connect/v2"
+  "connectrpc.com/connect/v2/connecthttp"
+  "connectrpc.com/grpchealth/v2"
 )
 
 func main() {
@@ -38,7 +40,9 @@ func main() {
     // for these fully-qualified protobuf service names, so you'd more likely
     // reference userv1.UserServiceName and groupv1.GroupServiceName.
   )
-  mux.Handle(grpchealth.NewHandler(checker))
+  connectServer := connect.NewServer()
+  grpchealth.Register(connectServer, checker)
+  connecthttp.Mount(mux, connectServer)
   // If you don't need to support HTTP/2 without TLS (h2c), you can use
   // http.ListenAndServeTLS instead.
   protocols := new(http.Protocols)
@@ -62,7 +66,7 @@ This module is stable. It supports:
 * [APIv2] of Protocol Buffers in Go (`google.golang.org/protobuf`).
 
 Within those parameters, `grpchealth` follows semantic versioning.
-We will _not_ make breaking changes in the 1.x series of releases.
+We will _not_ make breaking changes in the 2.x series of releases.
 
 ## Legal
 

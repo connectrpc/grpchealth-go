@@ -16,16 +16,15 @@ package grpchealth
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
 )
 
 // StaticChecker is a simple Checker implementation. It always returns
 // StatusServing for the process, and it returns a static value for each
-// service. It also implements [Watcher], so the handler returned by
-// [NewHandler] supports the streaming Watch RPC.
+// service. It also implements [Watcher], so the service registered by
+// [Register] supports the streaming Watch RPC.
 //
 // If you have a dynamic list of services, want to ping a database as part of
 // your health check, or otherwise need something more specialized, you should
@@ -82,9 +81,9 @@ func (c *StaticChecker) Check(_ context.Context, req *CheckRequest) (*CheckRespo
 	if req.Service == "" {
 		return &CheckResponse{Status: StatusServing}, nil
 	}
-	return nil, connect.NewError(
+	return nil, connect.Errorf(
 		connect.CodeNotFound,
-		fmt.Errorf("unknown service %s", req.Service),
+		"unknown service %s", req.Service,
 	)
 }
 
@@ -96,9 +95,9 @@ func (c *StaticChecker) Watch(_ context.Context, req *CheckRequest, onChange fun
 		c.watchers = make(map[string][]*staticWatchEntry)
 	}
 	if _, registered := c.statuses[req.Service]; !registered && req.Service != "" {
-		return nil, connect.NewError(
+		return nil, connect.Errorf(
 			connect.CodeNotFound,
-			fmt.Errorf("unknown service %s", req.Service),
+			"unknown service %s", req.Service,
 		)
 	}
 	entry := &staticWatchEntry{

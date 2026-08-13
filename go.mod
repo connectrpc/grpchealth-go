@@ -1,10 +1,8 @@
-module connectrpc.com/grpchealth
+module connectrpc.com/grpchealth/v2
 
-go 1.24.0
-
-retract v1.1.1 // module cache poisoned, use v1.1.2
+go 1.25.0
 
 require (
-	connectrpc.com/connect v1.11.0
-	google.golang.org/protobuf v1.33.0
+	connectrpc.com/connect/v2 v2.0.0-alpha.1
+	google.golang.org/protobuf v1.36.11
 )
