@@ -21,7 +21,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"connectrpc.com/connect"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
 )
 
 func TestClient_Check(t *testing.T) {
@@ -32,13 +33,19 @@ func TestClient_Check(t *testing.T) {
 	t.Parallel()
 	checker := NewStaticChecker(userFQN)
 	mux := http.NewServeMux()
-	mux.Handle(NewHandler(checker))
+	connectServer := connect.NewServer()
+	Register(connectServer, checker)
+	connecthttp.Mount(mux, connectServer)
 	server := httptest.NewUnstartedServer(mux)
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	t.Cleanup(server.Close)
 
-	client := NewClient(server.Client(), server.URL, connect.WithGRPC())
+	client := NewClient(connect.NewClient(connecthttp.NewTransport(
+		server.Client(),
+		server.URL,
+		connecthttp.WithGRPC(),
+	)))
 
 	assertStatus := func(t *testing.T, service string, expect Status) {
 		t.Helper()
@@ -82,13 +89,19 @@ func TestClient_Watch(t *testing.T) {
 	t.Parallel()
 	checker := NewStaticChecker(userFQN)
 	mux := http.NewServeMux()
-	mux.Handle(NewHandler(checker))
+	connectServer := connect.NewServer()
+	Register(connectServer, checker)
+	connecthttp.Mount(mux, connectServer)
 	server := httptest.NewUnstartedServer(mux)
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	t.Cleanup(server.Close)
 
-	client := NewClient(server.Client(), server.URL, connect.WithGRPC())
+	client := NewClient(connect.NewClient(connecthttp.NewTransport(
+		server.Client(),
+		server.URL,
+		connecthttp.WithGRPC(),
+	)))
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
@@ -128,13 +141,19 @@ func TestClient_Watch_unknownService(t *testing.T) {
 	t.Parallel()
 	checker := NewStaticChecker()
 	mux := http.NewServeMux()
-	mux.Handle(NewHandler(checker))
+	connectServer := connect.NewServer()
+	Register(connectServer, checker)
+	connecthttp.Mount(mux, connectServer)
 	server := httptest.NewUnstartedServer(mux)
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	t.Cleanup(server.Close)
 
-	client := NewClient(server.Client(), server.URL, connect.WithGRPC())
+	client := NewClient(connect.NewClient(connecthttp.NewTransport(
+		server.Client(),
+		server.URL,
+		connecthttp.WithGRPC(),
+	)))
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
