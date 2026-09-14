@@ -2,7 +2,6 @@ grpchealth
 ==========
 
 [![Build](https://github.com/connectrpc/grpchealth-go/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/connectrpc/grpchealth-go/actions/workflows/ci.yaml)
-[![Report Card](https://goreportcard.com/badge/connectrpc.com/grpchealth)](https://goreportcard.com/report/connectrpc.com/grpchealth)
 [![GoDoc](https://pkg.go.dev/badge/connectrpc.com/grpchealth.svg)](https://pkg.go.dev/connectrpc.com/grpchealth)
 
 `connectrpc.com/grpchealth` adds support for gRPC-style health checks to any
