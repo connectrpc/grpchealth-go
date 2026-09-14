@@ -17,14 +17,16 @@ package grpchealth
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"testing/quick"
 
-	"connectrpc.com/connect"
-	healthv1 "connectrpc.com/grpchealth/internal/gen/go/connectext/grpc/health/v1"
+	"connectrpc.com/connect/v2"
+	"connectrpc.com/connect/v2/connecthttp"
+	healthv1 "connectrpc.com/grpchealth/v2/internal/gen/go/connectext/grpc/health/v1"
 )
 
 func TestCode(t *testing.T) {
@@ -60,17 +62,24 @@ func TestHealth_Check(t *testing.T) {
 	t.Parallel()
 	mux := http.NewServeMux()
 	checker := NewStaticChecker(userFQN)
-	mux.Handle(NewHandler(checker))
+	connectServer := connect.NewServer()
+	Register(connectServer, checker)
+	connecthttp.Mount(mux, connectServer)
 	server := httptest.NewUnstartedServer(mux)
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	t.Cleanup(server.Close)
 
-	client := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
+	transport := connecthttp.NewTransport(
 		server.Client(),
-		server.URL+checkProcedure,
-		connect.WithGRPC(),
+		server.URL,
+		connecthttp.WithGRPC(),
 	)
+	client := connect.NewClient(transport)
+	checkSpec := connect.Spec{
+		StreamType: connect.StreamTypeUnary,
+		Procedure:  checkProcedure,
+	}
 
 	assertStatus := func(
 		t *testing.T,
@@ -78,15 +87,18 @@ func TestHealth_Check(t *testing.T) {
 		expect Status,
 	) {
 		t.Helper()
-		res, err := client.CallUnary(
+		var res healthv1.HealthCheckResponse
+		err := client.CallUnary(
 			t.Context(),
-			connect.NewRequest(&healthv1.HealthCheckRequest{Service: service}),
+			checkSpec,
+			&healthv1.HealthCheckRequest{Service: service},
+			&res,
 		)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		if Status(res.Msg.GetStatus()) != expect { //nolint:gosec // Conversion is safe here
-			t.Fatalf("got status %v, expected %v", res.Msg.GetStatus(), expect)
+		if Status(res.GetStatus()) != expect { //nolint:gosec // Conversion is safe here
+			t.Fatalf("got status %v, expected %v", res.GetStatus(), expect)
 		}
 	}
 	assertUnknown := func(
@@ -94,9 +106,12 @@ func TestHealth_Check(t *testing.T) {
 		service string,
 	) {
 		t.Helper()
-		_, err := client.CallUnary(
+		var res healthv1.HealthCheckResponse
+		err := client.CallUnary(
 			t.Context(),
-			connect.NewRequest(&healthv1.HealthCheckRequest{Service: service}),
+			checkSpec,
+			&healthv1.HealthCheckRequest{Service: service},
+			&res,
 		)
 		if err == nil {
 			t.Fatalf("expected error checking unknown service %q", service)
@@ -133,34 +148,44 @@ func TestHealth_Watch(t *testing.T) {
 	t.Parallel()
 	checker := NewStaticChecker(userFQN, pingFQN)
 	mux := http.NewServeMux()
-	mux.Handle(NewHandler(checker))
+	connectServer := connect.NewServer()
+	Register(connectServer, checker)
+	connecthttp.Mount(mux, connectServer)
 	server := httptest.NewUnstartedServer(mux)
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	t.Cleanup(server.Close)
 
-	watchClient := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
+	transport := connecthttp.NewTransport(
 		server.Client(),
-		server.URL+watchProcedure,
-		connect.WithGRPC(),
+		server.URL,
+		connecthttp.WithGRPC(),
 	)
-	openStream := func(ctx context.Context, service string) *connect.ServerStreamForClient[healthv1.HealthCheckResponse] {
+	client := connect.NewClient(transport)
+	watchSpec := connect.Spec{
+		StreamType: connect.StreamTypeServer,
+		Procedure:  watchProcedure,
+	}
+
+	openStream := func(ctx context.Context, service string) connect.ClientStream {
 		t.Helper()
-		stream, err := watchClient.CallServerStream(
+		stream, err := client.CallServerStream(
 			ctx,
-			connect.NewRequest(&healthv1.HealthCheckRequest{Service: service}),
+			watchSpec,
+			&healthv1.HealthCheckRequest{Service: service},
 		)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
 		return stream
 	}
-	receiveStatus := func(t *testing.T, stream *connect.ServerStreamForClient[healthv1.HealthCheckResponse], expect Status) {
+	receiveStatus := func(t *testing.T, stream connect.ClientStream, expect Status) {
 		t.Helper()
-		if ok := stream.Receive(); !ok {
-			t.Fatalf("expected message from Watch, got error: %v", stream.Err())
+		var res healthv1.HealthCheckResponse
+		if err := stream.Receive(&res); err != nil {
+			t.Fatalf("expected message from Watch, got error: %v", err)
 		}
-		if got := Status(stream.Msg().GetStatus()); got != expect { //nolint:gosec
+		if got := Status(res.GetStatus()); got != expect { //nolint:gosec
 			t.Fatalf("got status %v, expected %v", got, expect)
 		}
 	}
@@ -168,12 +193,14 @@ func TestHealth_Watch(t *testing.T) {
 	// Watching an unknown service should return CodeNotFound.
 	unknownStream := openStream(t.Context(), "unknown.Service")
 	defer unknownStream.Close()
-	if ok := unknownStream.Receive(); ok {
+	var unknownRes healthv1.HealthCheckResponse
+	err := unknownStream.Receive(&unknownRes)
+	if err == nil {
 		t.Fatal("expected error from Watch on unknown service, got message")
 	}
 	var connectErr *connect.Error
-	if !errors.As(unknownStream.Err(), &connectErr) {
-		t.Fatalf("got %v (%T), expected a *connect.Error", unknownStream.Err(), unknownStream.Err())
+	if !errors.As(err, &connectErr) {
+		t.Fatalf("got %v (%T), expected a *connect.Error", err, err)
 	}
 	if code := connectErr.Code(); code != connect.CodeNotFound {
 		t.Fatalf("got code %v, expected CodeNotFound", code)
@@ -218,11 +245,23 @@ func TestHealth_Watch(t *testing.T) {
 
 	// Cancel the context and verify the streams end.
 	cancel()
-	for userStream.Receive() {
+	for {
+		var res healthv1.HealthCheckResponse
+		if err := userStream.Receive(&res); err != nil {
+			break
+		}
 	}
-	for pingStream.Receive() {
+	for {
+		var res healthv1.HealthCheckResponse
+		if err := pingStream.Receive(&res); err != nil {
+			break
+		}
 	}
-	for processStream.Receive() {
+	for {
+		var res healthv1.HealthCheckResponse
+		if err := processStream.Receive(&res); err != nil {
+			break
+		}
 	}
 }
 
@@ -232,34 +271,45 @@ func TestWatchUnimplemented(t *testing.T) {
 		return &CheckResponse{Status: StatusServing}, nil
 	})
 	mux := http.NewServeMux()
-	mux.Handle(NewHandler(checker))
+	connectServer := connect.NewServer()
+	Register(connectServer, checker)
+	connecthttp.Mount(mux, connectServer)
 	server := httptest.NewUnstartedServer(mux)
 	server.EnableHTTP2 = true
 	server.StartTLS()
 	t.Cleanup(server.Close)
 
-	watchClient := connect.NewClient[healthv1.HealthCheckRequest, healthv1.HealthCheckResponse](
+	transport := connecthttp.NewTransport(
 		server.Client(),
-		server.URL+watchProcedure,
-		connect.WithGRPC(),
+		server.URL,
+		connecthttp.WithGRPC(),
 	)
-	stream, err := watchClient.CallServerStream(
+	client := connect.NewClient(transport)
+	watchSpec := connect.Spec{
+		StreamType: connect.StreamTypeServer,
+		Procedure:  watchProcedure,
+	}
+
+	stream, err := client.CallServerStream(
 		t.Context(),
-		connect.NewRequest(&healthv1.HealthCheckRequest{Service: "anything"}),
+		watchSpec,
+		&healthv1.HealthCheckRequest{Service: "anything"},
 	)
 	if err != nil {
 		t.Fatal(err.Error())
 	}
 	defer stream.Close()
-	if ok := stream.Receive(); ok {
+	var res healthv1.HealthCheckResponse
+	err = stream.Receive(&res)
+	if err == nil {
 		t.Fatalf("got message from Watch")
 	}
-	if stream.Err() == nil {
-		t.Fatalf("expected error from stream")
+	if errors.Is(err, io.EOF) {
+		t.Fatalf("expected error from stream, got EOF")
 	}
 	var connectErr *connect.Error
-	if ok := errors.As(stream.Err(), &connectErr); !ok {
-		t.Fatalf("got %v (%T), expected a *connect.Error", stream.Err(), stream.Err())
+	if ok := errors.As(err, &connectErr); !ok {
+		t.Fatalf("got %v (%T), expected a *connect.Error", err, err)
 	}
 	if code := connectErr.Code(); code != connect.CodeUnimplemented {
 		t.Fatalf("got code %v, expected CodeUnimplemented", code)
