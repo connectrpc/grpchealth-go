@@ -4,8 +4,10 @@ linters:
   disable:
     - cyclop            # covered by gocyclo
     - depguard          # unnecessary for small libraries
+    - exhaustruct       # deprecated, replaced by exhaustruct_v5
     - funlen            # rely on code review to limit function length
     - gocognit          # dubious "cognitive overhead" quantification
+    - gomodguard        # deprecated, replaced by gomodguard_v2
     - inamedparam       # convention is not followed
     - ireturn           # "accept interfaces, return structs" isn't ironclad
     - lll               # don't want hard limits for line length
@@ -21,9 +23,10 @@ linters:
   settings:
     errcheck:
       check-type-assertions: true
-    exhaustruct:
-      include:
-        # No zero values for param structs.
+    exhaustruct_v5:
+      # No zero values for param structs.
+      explicit-mode: true
+      enforce-patterns:
         - connectrpc\.com/grpchealth\..*[pP]arams
     forbidigo:
       forbid:
