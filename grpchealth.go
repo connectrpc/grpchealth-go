@@ -170,9 +170,9 @@ func (h *handler) check(
 	if err != nil {
 		return err
 	}
-	return stream.Send(&healthv1.HealthCheckResponse{
+	return stream.Send(healthv1.HealthCheckResponse_builder{
 		Status: healthv1.HealthCheckResponse_ServingStatus(checkResponse.Status),
-	})
+	}.Build())
 }
 
 func (h *handler) watch(
@@ -236,5 +236,5 @@ func (h *handler) checkAndSend(
 		return nil
 	}
 	*lastStatus = status
-	return stream.Send(&healthv1.HealthCheckResponse{Status: status})
+	return stream.Send(healthv1.HealthCheckResponse_builder{Status: status}.Build())
 }

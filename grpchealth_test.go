@@ -91,7 +91,7 @@ func TestHealth_Check(t *testing.T) {
 		err := client.CallUnary(
 			t.Context(),
 			checkSpec,
-			&healthv1.HealthCheckRequest{Service: service},
+			healthv1.HealthCheckRequest_builder{Service: service}.Build(),
 			&res,
 		)
 		if err != nil {
@@ -110,7 +110,7 @@ func TestHealth_Check(t *testing.T) {
 		err := client.CallUnary(
 			t.Context(),
 			checkSpec,
-			&healthv1.HealthCheckRequest{Service: service},
+			healthv1.HealthCheckRequest_builder{Service: service}.Build(),
 			&res,
 		)
 		if err == nil {
@@ -172,7 +172,7 @@ func TestHealth_Watch(t *testing.T) {
 		stream, err := client.CallServerStream(
 			ctx,
 			watchSpec,
-			&healthv1.HealthCheckRequest{Service: service},
+			healthv1.HealthCheckRequest_builder{Service: service}.Build(),
 		)
 		if err != nil {
 			t.Fatal(err.Error())
@@ -293,7 +293,7 @@ func TestWatchUnimplemented(t *testing.T) {
 	stream, err := client.CallServerStream(
 		t.Context(),
 		watchSpec,
-		&healthv1.HealthCheckRequest{Service: "anything"},
+		healthv1.HealthCheckRequest_builder{Service: "anything"}.Build(),
 	)
 	if err != nil {
 		t.Fatal(err.Error())

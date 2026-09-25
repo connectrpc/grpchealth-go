@@ -32,7 +32,6 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
-	sync "sync"
 	unsafe "unsafe"
 )
 
@@ -90,16 +89,11 @@ func (x HealthCheckResponse_ServingStatus) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use HealthCheckResponse_ServingStatus.Descriptor instead.
-func (HealthCheckResponse_ServingStatus) EnumDescriptor() ([]byte, []int) {
-	return file_connectext_grpc_health_v1_health_proto_rawDescGZIP(), []int{1, 0}
-}
-
 type HealthCheckRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Service       string                 `protobuf:"bytes,1,opt,name=service,proto3" json:"service,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Service string                 `protobuf:"bytes,1,opt,name=service,proto3"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *HealthCheckRequest) Reset() {
@@ -127,23 +121,36 @@ func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
-func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
-	return file_connectext_grpc_health_v1_health_proto_rawDescGZIP(), []int{0}
-}
-
 func (x *HealthCheckRequest) GetService() string {
 	if x != nil {
-		return x.Service
+		return x.xxx_hidden_Service
 	}
 	return ""
 }
 
+func (x *HealthCheckRequest) SetService(v string) {
+	x.xxx_hidden_Service = v
+}
+
+type HealthCheckRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Service string
+}
+
+func (b0 HealthCheckRequest_builder) Build() *HealthCheckRequest {
+	m0 := &HealthCheckRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Service = b.Service
+	return m0
+}
+
 type HealthCheckResponse struct {
-	state         protoimpl.MessageState            `protogen:"open.v1"`
-	Status        HealthCheckResponse_ServingStatus `protobuf:"varint,1,opt,name=status,proto3,enum=connectext.grpc.health.v1.HealthCheckResponse_ServingStatus" json:"status,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState            `protogen:"opaque.v1"`
+	xxx_hidden_Status HealthCheckResponse_ServingStatus `protobuf:"varint,1,opt,name=status,proto3,enum=connectext.grpc.health.v1.HealthCheckResponse_ServingStatus"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *HealthCheckResponse) Reset() {
@@ -171,16 +178,29 @@ func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
-func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
-	return file_connectext_grpc_health_v1_health_proto_rawDescGZIP(), []int{1}
-}
-
 func (x *HealthCheckResponse) GetStatus() HealthCheckResponse_ServingStatus {
 	if x != nil {
-		return x.Status
+		return x.xxx_hidden_Status
 	}
 	return HealthCheckResponse_SERVING_STATUS_UNSPECIFIED
+}
+
+func (x *HealthCheckResponse) SetStatus(v HealthCheckResponse_ServingStatus) {
+	x.xxx_hidden_Status = v
+}
+
+type HealthCheckResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Status HealthCheckResponse_ServingStatus
+}
+
+func (b0 HealthCheckResponse_builder) Build() *HealthCheckResponse {
+	m0 := &HealthCheckResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Status = b.Status
+	return m0
 }
 
 var File_connectext_grpc_health_v1_health_proto protoreflect.FileDescriptor
@@ -201,18 +221,6 @@ const file_connectext_grpc_health_v1_health_proto_rawDesc = "" +
 	"\x05Check\x12-.connectext.grpc.health.v1.HealthCheckRequest\x1a..connectext.grpc.health.v1.HealthCheckResponse\x12h\n" +
 	"\x05Watch\x12-.connectext.grpc.health.v1.HealthCheckRequest\x1a..connectext.grpc.health.v1.HealthCheckResponse0\x01B\x84\x02\n" +
 	"\x1dcom.connectext.grpc.health.v1B\vHealthProtoP\x01ZOconnectrpc.com/grpchealth/v2/internal/gen/go/connectext/grpc/health/v1;healthv1\xa2\x02\x03CGH\xaa\x02\x19Connectext.Grpc.Health.V1\xca\x02\x19Connectext\\Grpc\\Health\\V1\xe2\x02%Connectext\\Grpc\\Health\\V1\\GPBMetadata\xea\x02\x1cConnectext::Grpc::Health::V1b\x06proto3"
-
-var (
-	file_connectext_grpc_health_v1_health_proto_rawDescOnce sync.Once
-	file_connectext_grpc_health_v1_health_proto_rawDescData []byte
-)
-
-func file_connectext_grpc_health_v1_health_proto_rawDescGZIP() []byte {
-	file_connectext_grpc_health_v1_health_proto_rawDescOnce.Do(func() {
-		file_connectext_grpc_health_v1_health_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_connectext_grpc_health_v1_health_proto_rawDesc), len(file_connectext_grpc_health_v1_health_proto_rawDesc)))
-	})
-	return file_connectext_grpc_health_v1_health_proto_rawDescData
-}
 
 var file_connectext_grpc_health_v1_health_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_connectext_grpc_health_v1_health_proto_msgTypes = make([]protoimpl.MessageInfo, 2)

@@ -58,9 +58,9 @@ func NewClient(client *connect.Client) *Client {
 // the returned error will have [connect.CodeNotFound].
 func (c *Client) Check(ctx context.Context, req *CheckRequest) (*CheckResponse, error) {
 	var res healthv1.HealthCheckResponse
-	if err := c.client.CallUnary(ctx, c.check, &healthv1.HealthCheckRequest{
+	if err := c.client.CallUnary(ctx, c.check, healthv1.HealthCheckRequest_builder{
 		Service: req.Service,
-	}, &res); err != nil {
+	}.Build(), &res); err != nil {
 		return nil, err
 	}
 	return &CheckResponse{
@@ -106,9 +106,9 @@ func (c *Client) Watch(ctx context.Context, req *CheckRequest) <-chan WatchEvent
 				return true
 			}
 		}
-		stream, err := c.client.CallServerStream(ctx, c.watch, &healthv1.HealthCheckRequest{
+		stream, err := c.client.CallServerStream(ctx, c.watch, healthv1.HealthCheckRequest_builder{
 			Service: req.Service,
-		})
+		}.Build())
 		if err != nil {
 			send(WatchEvent{Err: err})
 			return
