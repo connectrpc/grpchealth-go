@@ -27,7 +27,7 @@ linters:
       # No zero values for param structs.
       explicit-mode: true
       enforce-patterns:
-        - connectrpc\.com/grpchealth\..*[pP]arams
+        - connectrpc\.com/grpchealth/v2\..*[pP]arams
     forbidigo:
       forbid:
         - pattern: ^fmt\.Print
