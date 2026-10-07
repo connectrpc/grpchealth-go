@@ -56,16 +56,19 @@ func main() {
 }
 ```
 
-## Status: Unstable
+## Status: Stable
 
-This module is unstable while connect-go v2 is in alpha. Expect breaking
-changes as we iterate toward a stable v2 release.
+This module, `connectrpc.com/grpchealth/v2`, is stable. It supports:
 
-It supports:
-
-* The two most recent major releases of Go (the same version of Go that continue to
-  [eceive security patches][go-support-policy]).
+* The two most recent major releases of Go (the same versions of Go that continue
+  to [receive security patches][go-support-policy]).
 * [APIv2] of Protocol Buffers in Go (`google.golang.org/protobuf`).
+
+Within those parameters, `grpchealth` follows semantic versioning. We will
+_not_ make breaking changes in the 2.x series of releases.
+
+Module `connectrpc.com/grpchealth` is the `v1` module. It remains stable and
+supported, and is compatible with `connectrpc.com/connect` v1.
 
 ## Legal
 
