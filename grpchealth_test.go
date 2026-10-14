@@ -16,6 +16,7 @@ package grpchealth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -138,6 +139,55 @@ func TestHealth_Check(t *testing.T) {
 	assertUnknown(t, unknown)
 	checker.SetStatus(unknown, StatusServing)
 	assertStatus(t, unknown, StatusServing)
+}
+
+func TestHealth_CheckJSON(t *testing.T) {
+	// JSON clients built from gRPC's health.proto decode enum values by
+	// name, so the names must match the upstream schema.
+	const (
+		servingFQN    = "acme.user.v1.UserService"
+		notServingFQN = "acme.ping.v1.PingService"
+	)
+	t.Parallel()
+	checker := NewStaticChecker(servingFQN, notServingFQN)
+	checker.SetStatus(notServingFQN, StatusNotServing)
+	mux := http.NewServeMux()
+	connectServer := connect.NewServer()
+	Register(connectServer, checker)
+	connecthttp.Mount(mux, connectServer)
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+
+	for service, expect := range map[string]string{
+		servingFQN:    "SERVING",
+		notServingFQN: "NOT_SERVING",
+	} {
+		req, err := http.NewRequestWithContext(
+			t.Context(),
+			http.MethodPost,
+			server.URL+checkProcedure,
+			strings.NewReader(`{"service":"`+service+`"}`),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		res, err := server.Client().Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var body struct {
+			Status string `json:"status"`
+		}
+		err = json.NewDecoder(res.Body).Decode(&body)
+		res.Body.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if body.Status != expect {
+			t.Errorf("check %q: got status %q, expected %q", service, body.Status, expect)
+		}
+	}
 }
 
 func TestHealth_Watch(t *testing.T) {
