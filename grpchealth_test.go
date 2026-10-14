@@ -33,9 +33,10 @@ func TestCode(t *testing.T) {
 	t.Parallel()
 
 	knownStatuses := map[Status]struct{}{
-		StatusUnknown:    {},
-		StatusServing:    {},
-		StatusNotServing: {},
+		StatusUnknown:        {},
+		StatusServing:        {},
+		StatusNotServing:     {},
+		StatusServiceUnknown: {},
 	}
 	check := func(s Status) bool {
 		got := s.String()
@@ -190,21 +191,16 @@ func TestHealth_Watch(t *testing.T) {
 		}
 	}
 
-	// Watching an unknown service should return CodeNotFound.
-	unknownStream := openStream(t.Context(), "unknown.Service")
+	// Watching an unknown service sends StatusServiceUnknown and keeps the
+	// stream open until the service becomes known.
+	unknownCtx, unknownCancel := context.WithCancel(t.Context())
+	defer unknownCancel()
+	unknownStream := openStream(unknownCtx, "unknown.Service")
 	defer unknownStream.Close()
-	var unknownRes healthv1.HealthCheckResponse
-	err := unknownStream.Receive(&unknownRes)
-	if err == nil {
-		t.Fatal("expected error from Watch on unknown service, got message")
-	}
-	var connectErr *connect.Error
-	if !errors.As(err, &connectErr) {
-		t.Fatalf("got %v (%T), expected a *connect.Error", err, err)
-	}
-	if code := connectErr.Code(); code != connect.CodeNotFound {
-		t.Fatalf("got code %v, expected CodeNotFound", code)
-	}
+	receiveStatus(t, unknownStream, StatusServiceUnknown)
+	checker.SetStatus("unknown.Service", StatusServing)
+	receiveStatus(t, unknownStream, StatusServing)
+	unknownCancel()
 
 	// Open three streams: two named services and the process-wide
 	// empty string. The empty string has no registered status, but

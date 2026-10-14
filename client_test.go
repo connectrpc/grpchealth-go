@@ -157,21 +157,24 @@ func TestClient_Watch_unknownService(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	gotErr := false
-	for event := range client.Watch(ctx, &CheckRequest{Service: "unknown.Service"}) {
-		if event.Err == nil {
-			t.Fatalf("expected error, got response: %v", event.Response)
+	events := client.Watch(ctx, &CheckRequest{Service: "unknown.Service"})
+	recv := func(t *testing.T, expect Status) {
+		t.Helper()
+		event, ok := <-events
+		if !ok {
+			t.Fatal("channel closed unexpectedly")
 		}
-		var connectErr *connect.Error
-		if !errors.As(event.Err, &connectErr) {
-			t.Fatalf("got %v (%T), expected a *connect.Error", event.Err, event.Err)
+		if event.Err != nil {
+			t.Fatalf("unexpected error: %v", event.Err)
 		}
-		if code := connectErr.Code(); code != connect.CodeNotFound {
-			t.Fatalf("got code %v, expected CodeNotFound", code)
+		if event.Response.Status != expect {
+			t.Fatalf("got status %v, expected %v", event.Response.Status, expect)
 		}
-		gotErr = true
 	}
-	if !gotErr {
-		t.Fatal("channel closed without delivering an error event")
-	}
+
+	// An unknown service reports StatusServiceUnknown, then its status
+	// once it becomes known.
+	recv(t, StatusServiceUnknown)
+	checker.SetStatus("unknown.Service", StatusNotServing)
+	recv(t, StatusNotServing)
 }

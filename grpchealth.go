@@ -54,6 +54,11 @@ const (
 	// not accepting requests. For example, StatusNotServing is often appropriate
 	// when your primary database is down or unreachable.
 	StatusNotServing Status = 2
+
+	// StatusServiceUnknown indicates that the watched service is not known to
+	// the server. It is only sent by the Watch RPC, which keeps the stream
+	// open and sends the service's status once it becomes known.
+	StatusServiceUnknown Status = 3
 )
 
 // String representation of the status.
@@ -65,6 +70,8 @@ func (s Status) String() string {
 		return "serving"
 	case StatusNotServing:
 		return "not_serving"
+	case StatusServiceUnknown:
+		return "service_unknown"
 	}
 
 	return fmt.Sprintf("status_%d", s)
@@ -114,7 +121,8 @@ type CheckRequest struct {
 // CheckResponse reports the health of a service (or of the whole process). The
 // only valid Status values are StatusUnknown, StatusServing, and
 // StatusNotServing. When asked to report on the status of an unknown service,
-// Checkers should return a connect.CodeNotFound error.
+// Checkers should return a connect.CodeNotFound error; the Watch RPC reports
+// that error to its caller as StatusServiceUnknown.
 //
 // Often, systems monitoring health respond to errors by restarting the
 // process. They often respond to StatusNotServing by removing the process from
@@ -136,9 +144,10 @@ type Watcher interface {
 	Checker
 
 	// Watch monitors the health of the requested service and calls onChange
-	// whenever the status may have changed. Implementations should return
-	// quickly rather than blocking. They may return an error if the request
-	// cannot be satisfied (for example, if the service is unknown). The
+	// whenever the status may have changed, including when an unknown
+	// service becomes known. Implementations should return quickly rather
+	// than blocking. They may return an error if the request cannot be
+	// satisfied, but should accept requests for unknown services. The
 	// context is only used for the duration of the Watch call itself; it
 	// does not govern the lifetime of the watch.
 	//
@@ -227,11 +236,16 @@ func (h *handler) checkAndSend(
 	lastStatus *healthv1.HealthCheckResponse_ServingStatus,
 	forceSend bool,
 ) error {
+	var status healthv1.HealthCheckResponse_ServingStatus
 	checkResponse, err := h.checker.Check(ctx, req)
-	if err != nil {
+	switch {
+	case connect.CodeOf(err) == connect.CodeNotFound:
+		status = healthv1.HealthCheckResponse_SERVING_STATUS_SERVICE_UNKNOWN
+	case err != nil:
 		return err
+	default:
+		status = healthv1.HealthCheckResponse_ServingStatus(checkResponse.Status)
 	}
-	status := healthv1.HealthCheckResponse_ServingStatus(checkResponse.Status)
 	if status == *lastStatus && !forceSend {
 		return nil
 	}
