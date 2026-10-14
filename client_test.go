@@ -133,7 +133,7 @@ func TestClient_Watch(t *testing.T) {
 
 	// Canceling the context closes the channel.
 	cancel()
-	for range events { //nolint:revive // Drain until the channel closes.
+	for range events { // Drain until the channel closes.
 	}
 }
 
