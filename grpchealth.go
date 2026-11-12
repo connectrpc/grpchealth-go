@@ -240,7 +240,7 @@ func (h *handler) checkAndSend(
 	checkResponse, err := h.checker.Check(ctx, req)
 	switch {
 	case connect.CodeOf(err) == connect.CodeNotFound:
-		status = healthv1.HealthCheckResponse_SERVING_STATUS_SERVICE_UNKNOWN
+		status = healthv1.HealthCheckResponse_SERVICE_UNKNOWN
 	case err != nil:
 		return err
 	default:
