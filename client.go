@@ -77,7 +77,9 @@ type WatchEvent struct {
 }
 
 // Watch streams health status changes for the requested service. Status
-// updates are delivered on the returned channel. The channel closes when the
+// updates are delivered on the returned channel. If the service is unknown,
+// the server sends [StatusServiceUnknown] and keeps the stream open, sending
+// the service's status once it becomes known. The channel closes when the
 // stream ends, either because ctx is canceled, the server terminates the
 // stream, or an error occurs. If the stream terminates with an error and ctx
 // has not been canceled, the final value on the channel has its Err field

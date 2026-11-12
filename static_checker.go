@@ -94,12 +94,6 @@ func (c *StaticChecker) Watch(_ context.Context, req *CheckRequest, onChange fun
 	if c.watchers == nil {
 		c.watchers = make(map[string][]*staticWatchEntry)
 	}
-	if _, registered := c.statuses[req.Service]; !registered && req.Service != "" {
-		return nil, connect.Errorf(
-			connect.CodeNotFound,
-			"unknown service %s", req.Service,
-		)
-	}
 	entry := &staticWatchEntry{
 		onChange: onChange,
 	}
