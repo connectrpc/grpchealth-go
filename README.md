@@ -75,7 +75,7 @@ supported, and is compatible with `connectrpc.com/connect` v1.
 Offered under the [Apache 2 license][license].
 
 [APIv2]: https://blog.golang.org/protobuf-apiv2
-[Getting Started]: https://connectrpc.com/go/getting-started
+[Getting Started]: https://connectrpc.com/docs/go/getting-started
 [blog]: https://buf.build/blog/connect-a-better-grpc
 [connect]: https://github.com/connectrpc/connect-go
 [examples-go]: https://github.com/connectrpc/examples-go
@@ -84,4 +84,4 @@ Offered under the [Apache 2 license][license].
 [grpc-health-probe]: https://github.com/grpc-ecosystem/grpc-health-probe/
 [grpcurl]: https://github.com/fullstorydev/grpcurl
 [k8s-liveness]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#define-a-grpc-liveness-probe
-[license]: https://github.com/connectrpc/grpchealth-go/blob/main/LICENSE.txt
+[license]: https://github.com/connectrpc/grpchealth-go/blob/main/LICENSE

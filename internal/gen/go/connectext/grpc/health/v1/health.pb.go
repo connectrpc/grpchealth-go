@@ -45,25 +45,25 @@ const (
 type HealthCheckResponse_ServingStatus int32
 
 const (
-	HealthCheckResponse_SERVING_STATUS_UNSPECIFIED     HealthCheckResponse_ServingStatus = 0
-	HealthCheckResponse_SERVING_STATUS_SERVING         HealthCheckResponse_ServingStatus = 1
-	HealthCheckResponse_SERVING_STATUS_NOT_SERVING     HealthCheckResponse_ServingStatus = 2
-	HealthCheckResponse_SERVING_STATUS_SERVICE_UNKNOWN HealthCheckResponse_ServingStatus = 3 // Used only by the Watch method.
+	HealthCheckResponse_UNKNOWN         HealthCheckResponse_ServingStatus = 0
+	HealthCheckResponse_SERVING         HealthCheckResponse_ServingStatus = 1
+	HealthCheckResponse_NOT_SERVING     HealthCheckResponse_ServingStatus = 2
+	HealthCheckResponse_SERVICE_UNKNOWN HealthCheckResponse_ServingStatus = 3 // Used only by the Watch method.
 )
 
 // Enum value maps for HealthCheckResponse_ServingStatus.
 var (
 	HealthCheckResponse_ServingStatus_name = map[int32]string{
-		0: "SERVING_STATUS_UNSPECIFIED",
-		1: "SERVING_STATUS_SERVING",
-		2: "SERVING_STATUS_NOT_SERVING",
-		3: "SERVING_STATUS_SERVICE_UNKNOWN",
+		0: "UNKNOWN",
+		1: "SERVING",
+		2: "NOT_SERVING",
+		3: "SERVICE_UNKNOWN",
 	}
 	HealthCheckResponse_ServingStatus_value = map[string]int32{
-		"SERVING_STATUS_UNSPECIFIED":     0,
-		"SERVING_STATUS_SERVING":         1,
-		"SERVING_STATUS_NOT_SERVING":     2,
-		"SERVING_STATUS_SERVICE_UNKNOWN": 3,
+		"UNKNOWN":         0,
+		"SERVING":         1,
+		"NOT_SERVING":     2,
+		"SERVICE_UNKNOWN": 3,
 	}
 )
 
@@ -182,7 +182,7 @@ func (x *HealthCheckResponse) GetStatus() HealthCheckResponse_ServingStatus {
 	if x != nil {
 		return x.xxx_hidden_Status
 	}
-	return HealthCheckResponse_SERVING_STATUS_UNSPECIFIED
+	return HealthCheckResponse_UNKNOWN
 }
 
 func (x *HealthCheckResponse) SetStatus(v HealthCheckResponse_ServingStatus) {
@@ -209,14 +209,14 @@ const file_connectext_grpc_health_v1_health_proto_rawDesc = "" +
 	"\n" +
 	"&connectext/grpc/health/v1/health.proto\x12\x19connectext.grpc.health.v1\".\n" +
 	"\x12HealthCheckRequest\x12\x18\n" +
-	"\aservice\x18\x01 \x01(\tR\aservice\"\xfd\x01\n" +
+	"\aservice\x18\x01 \x01(\tR\aservice\"\xbc\x01\n" +
 	"\x13HealthCheckResponse\x12T\n" +
-	"\x06status\x18\x01 \x01(\x0e2<.connectext.grpc.health.v1.HealthCheckResponse.ServingStatusR\x06status\"\x8f\x01\n" +
-	"\rServingStatus\x12\x1e\n" +
-	"\x1aSERVING_STATUS_UNSPECIFIED\x10\x00\x12\x1a\n" +
-	"\x16SERVING_STATUS_SERVING\x10\x01\x12\x1e\n" +
-	"\x1aSERVING_STATUS_NOT_SERVING\x10\x02\x12\"\n" +
-	"\x1eSERVING_STATUS_SERVICE_UNKNOWN\x10\x032\xda\x01\n" +
+	"\x06status\x18\x01 \x01(\x0e2<.connectext.grpc.health.v1.HealthCheckResponse.ServingStatusR\x06status\"O\n" +
+	"\rServingStatus\x12\v\n" +
+	"\aUNKNOWN\x10\x00\x12\v\n" +
+	"\aSERVING\x10\x01\x12\x0f\n" +
+	"\vNOT_SERVING\x10\x02\x12\x13\n" +
+	"\x0fSERVICE_UNKNOWN\x10\x032\xda\x01\n" +
 	"\x06Health\x12f\n" +
 	"\x05Check\x12-.connectext.grpc.health.v1.HealthCheckRequest\x1a..connectext.grpc.health.v1.HealthCheckResponse\x12h\n" +
 	"\x05Watch\x12-.connectext.grpc.health.v1.HealthCheckRequest\x1a..connectext.grpc.health.v1.HealthCheckResponse0\x01B\x84\x02\n" +
